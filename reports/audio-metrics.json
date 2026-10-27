@@ -1,0 +1,1132 @@
+{
+  "generatedAt": "2026-10-27T20:43:10.578Z",
+  "sampleRate": 48000,
+  "definitions": {
+    "firingPeak": "strongest bin in [0.5,1.5]×rpm/20 Hz, Welch 32768 Hann, parabolic interp; |err| ≤ 3%",
+    "dominance": "tonal peak = local max ≥10 dB above ±60 Hz median, 20 Hz–8 kHz; firing line within 3 dB of strongest",
+    "clicks": "residual r = 4th-order Butterworth HP @16 kHz (above the engine model content); flag |r| > 9 × local RMS(r) (±10 ms, ±8 sample guard) and > 1e-4 (production renders: and within 40 dB of the local ±10 ms peak — audibility floor); sensitivity = smallest injected step (dBFS) found 8/8. Production render: 0 flags and must catch a step at its own RMS level. Linear diagnostic render (noise off, rasp/drive/dynamics neutral): 0 flags and must catch ≤ −40 dBFS steps",
+    "centroid": "magnitude-weighted spectral centroid 20 Hz–20 kHz",
+    "levels": "rendered at volume 1.0 (maximum, = volume cap); Street preset unless noted"
+  },
+  "fixedRpm": {
+    "full": [
+      {
+        "rpm": 900,
+        "firingHz": 45,
+        "peakHz": 44.98,
+        "errorPct": -0.05,
+        "o3Db": -10.26,
+        "strongestTonal": {
+          "hz": 45,
+          "order": 3,
+          "db": -10.26
+        },
+        "o3MinusStrongestDb": 0,
+        "topTonalOrders": [
+          3,
+          6,
+          1.5,
+          9,
+          12,
+          15
+        ],
+        "ordersRelO3Db": {
+          "1": -33.8,
+          "3": 0,
+          "6": -9.2,
+          "9": -14.9,
+          "12": -19,
+          "15": -24.9,
+          "18": -26.9,
+          "0.5": -43.7,
+          "1.5": -10.5,
+          "4.5": -27.9,
+          "7.5": -29
+        },
+        "centroidHz": 722,
+        "rmsDb": -12.29,
+        "peakDb": -4.02,
+        "clicks": {
+          "clicks": 0,
+          "clickTimesS": [],
+          "worstRatio": 0,
+          "worstAtS": 0.3,
+          "detectorSensitivityDb": null,
+          "maxSampleDelta": 0.02483,
+          "peakDb": -4.02,
+          "rmsDb": -12.29
+        }
+      },
+      {
+        "rpm": 2000,
+        "firingHz": 100,
+        "peakHz": 100.02,
+        "errorPct": 0.023,
+        "o3Db": -10.54,
+        "strongestTonal": {
+          "hz": 100,
+          "order": 3,
+          "db": -10.54
+        },
+        "o3MinusStrongestDb": 0,
+        "topTonalOrders": [
+          3,
+          6,
+          1.5,
+          9,
+          12,
+          15
+        ],
+        "ordersRelO3Db": {
+          "1": -29.8,
+          "3": 0,
+          "6": -9.6,
+          "9": -16.6,
+          "12": -19.7,
+          "15": -24,
+          "18": -29.1,
+          "0.5": -33.6,
+          "1.5": -10.3,
+          "4.5": -27.5,
+          "7.5": -31.9
+        },
+        "centroidHz": 1234,
+        "rmsDb": -12.59,
+        "peakDb": -3.92,
+        "clicks": {
+          "clicks": 0,
+          "clickTimesS": [],
+          "worstRatio": 0,
+          "worstAtS": 0.3,
+          "detectorSensitivityDb": null,
+          "maxSampleDelta": 0.03876,
+          "peakDb": -3.92,
+          "rmsDb": -12.61
+        }
+      },
+      {
+        "rpm": 3500,
+        "firingHz": 175,
+        "peakHz": 175.01,
+        "errorPct": 0.004,
+        "o3Db": -9.99,
+        "strongestTonal": {
+          "hz": 175,
+          "order": 3,
+          "db": -9.99
+        },
+        "o3MinusStrongestDb": 0,
+        "topTonalOrders": [
+          3,
+          6,
+          1.5,
+          9,
+          12,
+          7.5
+        ],
+        "ordersRelO3Db": {
+          "1": -31.7,
+          "3": 0,
+          "6": -9,
+          "9": -19.8,
+          "12": -23.6,
+          "15": -27.2,
+          "18": -32.2,
+          "0.5": -31.2,
+          "1.5": -11.4,
+          "4.5": -31.6,
+          "7.5": -25.6
+        },
+        "centroidHz": 1755,
+        "rmsDb": -12.27,
+        "peakDb": -4.74,
+        "clicks": {
+          "clicks": 0,
+          "clickTimesS": [],
+          "worstRatio": 0,
+          "worstAtS": 0.3,
+          "detectorSensitivityDb": null,
+          "maxSampleDelta": 0.05518,
+          "peakDb": -4.74,
+          "rmsDb": -12.26
+        }
+      },
+      {
+        "rpm": 5000,
+        "firingHz": 250,
+        "peakHz": 249.98,
+        "errorPct": -0.008,
+        "o3Db": -13.38,
+        "strongestTonal": {
+          "hz": 250,
+          "order": 3,
+          "db": -13.38
+        },
+        "o3MinusStrongestDb": 0,
+        "topTonalOrders": [
+          3,
+          6,
+          1.5,
+          9,
+          15,
+          4.5
+        ],
+        "ordersRelO3Db": {
+          "1": -30.4,
+          "3": 0,
+          "6": -7.1,
+          "9": -15,
+          "12": -21.5,
+          "15": -20.8,
+          "18": -31.9,
+          "0.5": -27.1,
+          "1.5": -7.1,
+          "4.5": -21.1,
+          "7.5": -31
+        },
+        "centroidHz": 2265,
+        "rmsDb": -14.77,
+        "peakDb": -5.31,
+        "clicks": {
+          "clicks": 0,
+          "clickTimesS": [],
+          "worstRatio": 0,
+          "worstAtS": 0.3,
+          "detectorSensitivityDb": null,
+          "maxSampleDelta": 0.06026,
+          "peakDb": -5.31,
+          "rmsDb": -14.78
+        }
+      },
+      {
+        "rpm": 7000,
+        "firingHz": 350,
+        "peakHz": 349.99,
+        "errorPct": -0.003,
+        "o3Db": -11.89,
+        "strongestTonal": {
+          "hz": 350,
+          "order": 3,
+          "db": -11.89
+        },
+        "o3MinusStrongestDb": 0,
+        "topTonalOrders": [
+          3,
+          1.5,
+          6,
+          9,
+          12,
+          10.5
+        ],
+        "ordersRelO3Db": {
+          "1": -31.2,
+          "3": 0,
+          "6": -10.5,
+          "9": -17.4,
+          "12": -22.8,
+          "15": -28.5,
+          "18": -36.2,
+          "0.5": -30.6,
+          "1.5": -9.7,
+          "4.5": -28.2,
+          "7.5": -28.6
+        },
+        "centroidHz": 2908,
+        "rmsDb": -13.9,
+        "peakDb": -5.41,
+        "clicks": {
+          "clicks": 0,
+          "clickTimesS": [],
+          "worstRatio": 0,
+          "worstAtS": 0.3,
+          "detectorSensitivityDb": null,
+          "maxSampleDelta": 0.07426,
+          "peakDb": -5.41,
+          "rmsDb": -13.89
+        }
+      },
+      {
+        "rpm": 8500,
+        "firingHz": 425,
+        "peakHz": 425.02,
+        "errorPct": 0.004,
+        "o3Db": -13.48,
+        "strongestTonal": {
+          "hz": 425,
+          "order": 3,
+          "db": -13.48
+        },
+        "o3MinusStrongestDb": 0,
+        "topTonalOrders": [
+          3,
+          6,
+          9,
+          1.5,
+          12,
+          15
+        ],
+        "ordersRelO3Db": {
+          "1": -29.8,
+          "3": 0,
+          "6": -5.3,
+          "9": -8.8,
+          "12": -22.7,
+          "15": -23.3,
+          "18": -28.2,
+          "0.5": -31.4,
+          "1.5": -12.3,
+          "4.5": -29.9,
+          "7.5": -32.3
+        },
+        "centroidHz": 3522,
+        "rmsDb": -14.49,
+        "peakDb": -5.31,
+        "clicks": {
+          "clicks": 0,
+          "clickTimesS": [],
+          "worstRatio": 0,
+          "worstAtS": 0.3,
+          "detectorSensitivityDb": null,
+          "maxSampleDelta": 0.14593,
+          "peakDb": -5.31,
+          "rmsDb": -14.51
+        }
+      }
+    ],
+    "light": [
+      {
+        "rpm": 900,
+        "firingHz": 45,
+        "peakHz": 44.98,
+        "errorPct": -0.045,
+        "o3Db": -16.77,
+        "strongestTonal": {
+          "hz": 45,
+          "order": 3,
+          "db": -16.77
+        },
+        "o3MinusStrongestDb": 0,
+        "topTonalOrders": [
+          3,
+          6,
+          1.5,
+          9,
+          12,
+          15
+        ],
+        "ordersRelO3Db": {
+          "1": -36.1,
+          "3": 0,
+          "6": -7.9,
+          "9": -13.3,
+          "12": -17.6,
+          "15": -23.8,
+          "18": -25,
+          "0.5": -54.8,
+          "1.5": -10.6,
+          "4.5": -24.8,
+          "7.5": -26.9
+        },
+        "centroidHz": 998,
+        "rmsDb": -18.57,
+        "peakDb": -7.86,
+        "clicks": {
+          "clicks": 0,
+          "clickTimesS": [],
+          "worstRatio": 0,
+          "worstAtS": 0.3,
+          "detectorSensitivityDb": null,
+          "maxSampleDelta": 0.01589,
+          "peakDb": -7.86,
+          "rmsDb": -18.51
+        }
+      },
+      {
+        "rpm": 2000,
+        "firingHz": 100,
+        "peakHz": 100.02,
+        "errorPct": 0.022,
+        "o3Db": -17.56,
+        "strongestTonal": {
+          "hz": 100,
+          "order": 3,
+          "db": -17.56
+        },
+        "o3MinusStrongestDb": 0,
+        "topTonalOrders": [
+          3,
+          6,
+          1.5,
+          9,
+          12,
+          15
+        ],
+        "ordersRelO3Db": {
+          "1": -29.9,
+          "3": 0,
+          "6": -8.6,
+          "9": -15.1,
+          "12": -18.9,
+          "15": -23.7,
+          "18": -30,
+          "0.5": -34.3,
+          "1.5": -10.2,
+          "4.5": -24.2,
+          "7.5": -31.2
+        },
+        "centroidHz": 1351,
+        "rmsDb": -19.37,
+        "peakDb": -7.44,
+        "clicks": {
+          "clicks": 0,
+          "clickTimesS": [],
+          "worstRatio": 0,
+          "worstAtS": 0.3,
+          "detectorSensitivityDb": null,
+          "maxSampleDelta": 0.02015,
+          "peakDb": -7.44,
+          "rmsDb": -19.31
+        }
+      },
+      {
+        "rpm": 3500,
+        "firingHz": 175,
+        "peakHz": 175.01,
+        "errorPct": 0.004,
+        "o3Db": -18.06,
+        "strongestTonal": {
+          "hz": 175,
+          "order": 3,
+          "db": -18.06
+        },
+        "o3MinusStrongestDb": 0,
+        "topTonalOrders": [
+          3,
+          6,
+          1.5,
+          9,
+          12,
+          7.5
+        ],
+        "ordersRelO3Db": {
+          "1": -31.2,
+          "3": 0,
+          "6": -7.9,
+          "9": -18.8,
+          "12": -23.1,
+          "15": -27.2,
+          "18": -35.6,
+          "0.5": -31.1,
+          "1.5": -11.1,
+          "4.5": -27.3,
+          "7.5": -23.8
+        },
+        "centroidHz": 1605,
+        "rmsDb": -19.97,
+        "peakDb": -8.93,
+        "clicks": {
+          "clicks": 0,
+          "clickTimesS": [],
+          "worstRatio": 0,
+          "worstAtS": 0.3,
+          "detectorSensitivityDb": null,
+          "maxSampleDelta": 0.03171,
+          "peakDb": -8.93,
+          "rmsDb": -20.03
+        }
+      },
+      {
+        "rpm": 5000,
+        "firingHz": 250,
+        "peakHz": 249.98,
+        "errorPct": -0.008,
+        "o3Db": -23.17,
+        "strongestTonal": {
+          "hz": 250,
+          "order": 3,
+          "db": -23.17
+        },
+        "o3MinusStrongestDb": 0,
+        "topTonalOrders": [
+          3,
+          6,
+          1.5,
+          9,
+          4.5,
+          15
+        ],
+        "ordersRelO3Db": {
+          "1": -32.4,
+          "3": 0,
+          "6": -5.5,
+          "9": -13,
+          "12": -21.7,
+          "15": -21,
+          "18": -31.1,
+          "0.5": -25.8,
+          "1.5": -6.9,
+          "4.5": -19.8,
+          "7.5": -28.8
+        },
+        "centroidHz": 1892,
+        "rmsDb": -23.75,
+        "peakDb": -10.46,
+        "clicks": {
+          "clicks": 0,
+          "clickTimesS": [],
+          "worstRatio": 0,
+          "worstAtS": 0.3,
+          "detectorSensitivityDb": null,
+          "maxSampleDelta": 0.03133,
+          "peakDb": -10.46,
+          "rmsDb": -23.73
+        }
+      },
+      {
+        "rpm": 7000,
+        "firingHz": 350,
+        "peakHz": 349.99,
+        "errorPct": -0.002,
+        "o3Db": -21.86,
+        "strongestTonal": {
+          "hz": 350,
+          "order": 3,
+          "db": -21.86
+        },
+        "o3MinusStrongestDb": 0,
+        "topTonalOrders": [
+          3,
+          6,
+          1.5,
+          9,
+          10.5,
+          12
+        ],
+        "ordersRelO3Db": {
+          "1": -27.8,
+          "3": 0,
+          "6": -7.8,
+          "9": -14.8,
+          "12": -23.8,
+          "15": -29.6,
+          "18": -25,
+          "0.5": -29.9,
+          "1.5": -9.2,
+          "4.5": -24.2,
+          "7.5": -26.7
+        },
+        "centroidHz": 2313,
+        "rmsDb": -23.06,
+        "peakDb": -10.57,
+        "clicks": {
+          "clicks": 0,
+          "clickTimesS": [],
+          "worstRatio": 0,
+          "worstAtS": 0.3,
+          "detectorSensitivityDb": null,
+          "maxSampleDelta": 0.03925,
+          "peakDb": -10.57,
+          "rmsDb": -23.11
+        }
+      },
+      {
+        "rpm": 8500,
+        "firingHz": 425,
+        "peakHz": 425.02,
+        "errorPct": 0.005,
+        "o3Db": -23.51,
+        "strongestTonal": {
+          "hz": 425,
+          "order": 3,
+          "db": -23.51
+        },
+        "o3MinusStrongestDb": 0,
+        "topTonalOrders": [
+          3,
+          6,
+          9,
+          1.5,
+          12,
+          18
+        ],
+        "ordersRelO3Db": {
+          "1": -29.8,
+          "3": 0,
+          "6": -4.9,
+          "9": -9.1,
+          "12": -18,
+          "15": -25.9,
+          "18": -22.3,
+          "0.5": -30,
+          "1.5": -12.6,
+          "4.5": -27.8,
+          "7.5": -32
+        },
+        "centroidHz": 3076,
+        "rmsDb": -23.68,
+        "peakDb": -10.58,
+        "clicks": {
+          "clicks": 0,
+          "clickTimesS": [],
+          "worstRatio": 0,
+          "worstAtS": 0.3,
+          "detectorSensitivityDb": null,
+          "maxSampleDelta": 0.07237,
+          "peakDb": -10.58,
+          "rmsDb": -23.69
+        }
+      }
+    ],
+    "off": [
+      {
+        "rpm": 900,
+        "firingHz": 45,
+        "peakHz": 44.98,
+        "errorPct": -0.044,
+        "o3Db": -18.49,
+        "strongestTonal": {
+          "hz": 45,
+          "order": 3,
+          "db": -18.49
+        },
+        "o3MinusStrongestDb": 0,
+        "topTonalOrders": [
+          3,
+          6,
+          1.5,
+          9,
+          12,
+          15
+        ],
+        "ordersRelO3Db": {
+          "1": -36.1,
+          "3": 0,
+          "6": -7.6,
+          "9": -13,
+          "12": -17.3,
+          "15": -23.7,
+          "18": -24.7,
+          "0.5": -54.6,
+          "1.5": -10.6,
+          "4.5": -24.7,
+          "7.5": -26.8
+        },
+        "centroidHz": 1047,
+        "rmsDb": -20.24,
+        "peakDb": -9.24,
+        "clicks": {
+          "clicks": 0,
+          "clickTimesS": [],
+          "worstRatio": 0,
+          "worstAtS": 0.3,
+          "detectorSensitivityDb": null,
+          "maxSampleDelta": 0.0135,
+          "peakDb": -9.24,
+          "rmsDb": -20.17
+        }
+      },
+      {
+        "rpm": 2000,
+        "firingHz": 100,
+        "peakHz": 100.02,
+        "errorPct": 0.023,
+        "o3Db": -25.56,
+        "strongestTonal": {
+          "hz": 100,
+          "order": 3,
+          "db": -25.56
+        },
+        "o3MinusStrongestDb": 0,
+        "topTonalOrders": [
+          3,
+          6,
+          1.5,
+          9,
+          12,
+          15
+        ],
+        "ordersRelO3Db": {
+          "1": -29.7,
+          "3": 0,
+          "6": -6.8,
+          "9": -12.8,
+          "12": -17.1,
+          "15": -23.4,
+          "18": -29.2,
+          "0.5": -34,
+          "1.5": -10.4,
+          "4.5": -24.1,
+          "7.5": -30.5
+        },
+        "centroidHz": 1815,
+        "rmsDb": -27.01,
+        "peakDb": -14.3,
+        "clicks": {
+          "clicks": 0,
+          "clickTimesS": [],
+          "worstRatio": 0,
+          "worstAtS": 0.3,
+          "detectorSensitivityDb": null,
+          "maxSampleDelta": 0.01086,
+          "peakDb": -14.3,
+          "rmsDb": -26.94
+        }
+      },
+      {
+        "rpm": 3500,
+        "firingHz": 175,
+        "peakHz": 175.01,
+        "errorPct": 0.005,
+        "o3Db": -26.06,
+        "strongestTonal": {
+          "hz": 175,
+          "order": 3,
+          "db": -26.06
+        },
+        "o3MinusStrongestDb": 0,
+        "topTonalOrders": [
+          3,
+          6,
+          1.5,
+          9,
+          12,
+          7.5
+        ],
+        "ordersRelO3Db": {
+          "1": -30.4,
+          "3": 0,
+          "6": -6,
+          "9": -16.3,
+          "12": -20.1,
+          "15": -27.6,
+          "18": -30.7,
+          "0.5": -27.1,
+          "1.5": -11,
+          "4.5": -25.5,
+          "7.5": -22.6
+        },
+        "centroidHz": 1690,
+        "rmsDb": -27.14,
+        "peakDb": -14.72,
+        "clicks": {
+          "clicks": 0,
+          "clickTimesS": [],
+          "worstRatio": 0,
+          "worstAtS": 0.3,
+          "detectorSensitivityDb": null,
+          "maxSampleDelta": 0.01847,
+          "peakDb": -14.72,
+          "rmsDb": -27.24
+        }
+      },
+      {
+        "rpm": 5000,
+        "firingHz": 250,
+        "peakHz": 249.99,
+        "errorPct": -0.006,
+        "o3Db": -31.32,
+        "strongestTonal": {
+          "hz": 250,
+          "order": 3,
+          "db": -31.32
+        },
+        "o3MinusStrongestDb": 0,
+        "topTonalOrders": [
+          3,
+          6,
+          1.5,
+          9,
+          12,
+          18
+        ],
+        "ordersRelO3Db": {
+          "1": -23.9,
+          "3": 0,
+          "6": -3.7,
+          "9": -9.4,
+          "12": -14.9,
+          "15": -21.7,
+          "18": -18,
+          "0.5": -25,
+          "1.5": -7.2,
+          "4.5": -19.1,
+          "7.5": -28.1
+        },
+        "centroidHz": 1850,
+        "rmsDb": -30.18,
+        "peakDb": -16.22,
+        "clicks": {
+          "clicks": 0,
+          "clickTimesS": [],
+          "worstRatio": 0,
+          "worstAtS": 0.3,
+          "detectorSensitivityDb": null,
+          "maxSampleDelta": 0.01777,
+          "peakDb": -16.22,
+          "rmsDb": -30.18
+        }
+      },
+      {
+        "rpm": 7000,
+        "firingHz": 350,
+        "peakHz": 350,
+        "errorPct": 0,
+        "o3Db": -30.14,
+        "strongestTonal": {
+          "hz": 350,
+          "order": 3,
+          "db": -30.14
+        },
+        "o3MinusStrongestDb": 0,
+        "topTonalOrders": [
+          3,
+          6,
+          1.5,
+          9,
+          12,
+          18
+        ],
+        "ordersRelO3Db": {
+          "1": -23.7,
+          "3": 0,
+          "6": -4.3,
+          "9": -9.1,
+          "12": -14.2,
+          "15": -30.2,
+          "18": -14.5,
+          "0.5": -25.7,
+          "1.5": -8.9,
+          "4.5": -22.5,
+          "7.5": -25.3
+        },
+        "centroidHz": 2129,
+        "rmsDb": -29.25,
+        "peakDb": -15.96,
+        "clicks": {
+          "clicks": 0,
+          "clickTimesS": [],
+          "worstRatio": 0,
+          "worstAtS": 0.3,
+          "detectorSensitivityDb": null,
+          "maxSampleDelta": 0.02137,
+          "peakDb": -15.96,
+          "rmsDb": -29.33
+        }
+      },
+      {
+        "rpm": 8500,
+        "firingHz": 425,
+        "peakHz": 425.03,
+        "errorPct": 0.008,
+        "o3Db": -32.01,
+        "strongestTonal": {
+          "hz": 425,
+          "order": 3,
+          "db": -32.01
+        },
+        "o3MinusStrongestDb": 0,
+        "topTonalOrders": [
+          3,
+          6,
+          9,
+          12,
+          18,
+          1.5
+        ],
+        "ordersRelO3Db": {
+          "1": -24.3,
+          "3": 0,
+          "6": -1.5,
+          "9": -4.8,
+          "12": -7.6,
+          "15": -26.6,
+          "18": -10.9,
+          "0.5": -24.4,
+          "1.5": -13,
+          "4.5": -26.5,
+          "7.5": -25.3
+        },
+        "centroidHz": 2876,
+        "rmsDb": -29.04,
+        "peakDb": -15.84,
+        "clicks": {
+          "clicks": 0,
+          "clickTimesS": [],
+          "worstRatio": 0,
+          "worstAtS": 0.3,
+          "detectorSensitivityDb": null,
+          "maxSampleDelta": 0.03917,
+          "peakDb": -15.84,
+          "rmsDb": -29.05
+        }
+      }
+    ],
+    "onOff": [
+      {
+        "rpm": 900,
+        "fullRmsDb": -12.29,
+        "lightRmsDb": -18.57,
+        "offRmsDb": -20.24,
+        "onMinusOffDb": 7.95,
+        "onMinusLightDb": 6.28
+      },
+      {
+        "rpm": 2000,
+        "fullRmsDb": -12.59,
+        "lightRmsDb": -19.37,
+        "offRmsDb": -27.01,
+        "onMinusOffDb": 14.42,
+        "onMinusLightDb": 6.78
+      },
+      {
+        "rpm": 3500,
+        "fullRmsDb": -12.27,
+        "lightRmsDb": -19.97,
+        "offRmsDb": -27.14,
+        "onMinusOffDb": 14.87,
+        "onMinusLightDb": 7.7
+      },
+      {
+        "rpm": 5000,
+        "fullRmsDb": -14.77,
+        "lightRmsDb": -23.75,
+        "offRmsDb": -30.18,
+        "onMinusOffDb": 15.41,
+        "onMinusLightDb": 8.98
+      },
+      {
+        "rpm": 7000,
+        "fullRmsDb": -13.9,
+        "lightRmsDb": -23.06,
+        "offRmsDb": -29.25,
+        "onMinusOffDb": 15.35,
+        "onMinusLightDb": 9.16
+      },
+      {
+        "rpm": 8500,
+        "fullRmsDb": -14.49,
+        "lightRmsDb": -23.68,
+        "offRmsDb": -29.04,
+        "onMinusOffDb": 14.55,
+        "onMinusLightDb": 9.19
+      }
+    ],
+    "centroidMonotonic": {
+      "full": true,
+      "light": true,
+      "off": false
+    }
+  },
+  "scenario_sweep": {
+    "clicks": 0,
+    "clickTimesS": [],
+    "worstRatio": 0,
+    "worstAtS": 0.05,
+    "detectorSensitivityDb": -24,
+    "maxSampleDelta": 0.17444,
+    "peakDb": -3.87,
+    "rmsDb": -15.6,
+    "renderMs": 207,
+    "realtimeFactor": 0.0153,
+    "tracking": {
+      "frames": 177,
+      "within3pct": 0.977,
+      "worstErrPct": 3.66
+    },
+    "linearDiagnostic": {
+      "clicks": 0,
+      "clickTimesS": [],
+      "worstRatio": 0,
+      "worstAtS": 0.05,
+      "detectorSensitivityDb": -60,
+      "maxSampleDelta": 0.01695,
+      "peakDb": -8.82,
+      "rmsDb": -22.93
+    }
+  },
+  "scenario_upshifts": {
+    "clicks": 0,
+    "clickTimesS": [],
+    "worstRatio": 5.18,
+    "worstAtS": 1.863,
+    "detectorSensitivityDb": -30,
+    "maxSampleDelta": 0.321,
+    "peakDb": -4.09,
+    "rmsDb": -14.66,
+    "renderMs": 110,
+    "realtimeFactor": 0.0151,
+    "linearDiagnostic": {
+      "clicks": 0,
+      "clickTimesS": [],
+      "worstRatio": 5.04,
+      "worstAtS": 3.913,
+      "detectorSensitivityDb": -60,
+      "maxSampleDelta": 0.07019,
+      "peakDb": -11.39,
+      "rmsDb": -25.07
+    }
+  },
+  "scenario_downshiftBlips": {
+    "clicks": 0,
+    "clickTimesS": [],
+    "worstRatio": 0,
+    "worstAtS": 0.05,
+    "detectorSensitivityDb": -30,
+    "maxSampleDelta": 0.08546,
+    "peakDb": -4.9,
+    "rmsDb": -26.32,
+    "renderMs": 120,
+    "realtimeFactor": 0.0164,
+    "linearDiagnostic": {
+      "clicks": 0,
+      "clickTimesS": [],
+      "worstRatio": 0,
+      "worstAtS": 0.05,
+      "detectorSensitivityDb": -60,
+      "maxSampleDelta": 0.00895,
+      "peakDb": -11.49,
+      "rmsDb": -34.3
+    }
+  },
+  "scenario_limiter": {
+    "clicks": 0,
+    "clickTimesS": [],
+    "worstRatio": 6.89,
+    "worstAtS": 2.8391,
+    "detectorSensitivityDb": -30,
+    "maxSampleDelta": 0.31468,
+    "peakDb": -4.02,
+    "rmsDb": -15,
+    "renderMs": 55,
+    "realtimeFactor": 0.0168,
+    "linearDiagnostic": {
+      "clicks": 0,
+      "clickTimesS": [],
+      "worstRatio": 0,
+      "worstAtS": 0.05,
+      "detectorSensitivityDb": -60,
+      "maxSampleDelta": 0.01583,
+      "peakDb": -12.71,
+      "rmsDb": -24.51
+    }
+  },
+  "scenario_overrunPops": {
+    "clicks": 0,
+    "clickTimesS": [],
+    "worstRatio": 0,
+    "worstAtS": 0.05,
+    "detectorSensitivityDb": -30,
+    "maxSampleDelta": 0.12901,
+    "peakDb": -4.14,
+    "rmsDb": -19.31,
+    "renderMs": 78,
+    "realtimeFactor": 0.0173,
+    "popsAfterLift": 3,
+    "linearDiagnostic": {
+      "clicks": 0,
+      "clickTimesS": [],
+      "worstRatio": 0,
+      "worstAtS": 0.05,
+      "detectorSensitivityDb": -60,
+      "maxSampleDelta": 0.01648,
+      "peakDb": -10.66,
+      "rmsDb": -28.28
+    }
+  },
+  "scenario_startStop": {
+    "clicks": 0,
+    "clickTimesS": [],
+    "worstRatio": 7.21,
+    "worstAtS": 4.7749,
+    "detectorSensitivityDb": -30,
+    "maxSampleDelta": 0.21055,
+    "peakDb": -4.17,
+    "rmsDb": -20.37,
+    "renderMs": 116,
+    "realtimeFactor": 0.0178,
+    "linearDiagnostic": {
+      "clicks": 0,
+      "clickTimesS": [],
+      "worstRatio": 6.72,
+      "worstAtS": 4.5303,
+      "detectorSensitivityDb": -60,
+      "maxSampleDelta": 0.0827,
+      "peakDb": -8.19,
+      "rmsDb": -28.09
+    }
+  },
+  "presets6000Full": {
+    "cabin": {
+      "centroidHz": 1056,
+      "rmsDb": -13.58,
+      "peakDb": -4.64
+    },
+    "street": {
+      "centroidHz": 2573,
+      "rmsDb": -14.31,
+      "peakDb": -5.05
+    },
+    "track": {
+      "centroidHz": 3110,
+      "rmsDb": -13.12,
+      "peakDb": -4.6
+    }
+  },
+  "sampleLayer": {
+    "steady3000": {
+      "peakHz": 150.02,
+      "errorPct": 0.012,
+      "peakDb": -5.26
+    },
+    "loopPointsAt4000": {
+      "clicks": 0,
+      "clickTimesS": [],
+      "worstRatio": 0,
+      "worstAtS": 0.3,
+      "detectorSensitivityDb": -60,
+      "maxSampleDelta": 0.04705,
+      "peakDb": -5.13,
+      "rmsDb": -11.97
+    },
+    "sweepSamplesOnly": {
+      "clicks": 0,
+      "clickTimesS": [],
+      "worstRatio": 0,
+      "worstAtS": 0.3,
+      "detectorSensitivityDb": -60,
+      "maxSampleDelta": 0.09878,
+      "peakDb": -4.25,
+      "rmsDb": -13.63
+    },
+    "sweepHalfMix": {
+      "clicks": 0,
+      "clickTimesS": [],
+      "worstRatio": 0,
+      "worstAtS": 0.3,
+      "detectorSensitivityDb": -30,
+      "maxSampleDelta": 0.14806,
+      "peakDb": -3.77,
+      "rmsDb": -14.55
+    },
+    "missingManifest": {
+      "loaded": false,
+      "rmsDb": -12.01
+    }
+  },
+  "performance": {
+    "audioSeconds": 10,
+    "renderMsRuns": [
+      164,
+      154,
+      153
+    ],
+    "renderSecondsBest": 0.153,
+    "realtimeFactor": 0.0153,
+    "cpuPercentOfOneCore": 1.53,
+    "synthOnlyRealtimeFactor": 0.0097,
+    "synthOnlyCpuPercentOfOneCore": 0.97,
+    "note": "Offline render on the test machine (headless Chromium); full graph, not just the worklet. The Tesla CPU is slower: budget is <15% of a core.",
+    "deterministic": true,
+    "sameSeedMaxDiffDb": -122.9
+  }
+}

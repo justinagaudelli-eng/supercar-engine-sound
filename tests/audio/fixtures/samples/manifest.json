@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "name": "synthetic-test-set",
+  "loops": [
+    {
+      "file": "on_2000.wav",
+      "rpm": 2000,
+      "layer": "on",
+      "loopStart": 0.1,
+      "loopEnd": 0.4,
+      "gain": 1
+    },
+    {
+      "file": "on_4000.wav",
+      "rpm": 4000,
+      "layer": "on",
+      "loopStart": 0.1,
+      "loopEnd": 0.4,
+      "gain": 1
+    },
+    {
+      "file": "on_6000.wav",
+      "rpm": 6000,
+      "layer": "on",
+      "loopStart": 0.1,
+      "loopEnd": 0.4,
+      "gain": 1
+    },
+    {
+      "file": "on_8000.wav",
+      "rpm": 8000,
+      "layer": "on",
+      "loopStart": 0.1,
+      "loopEnd": 0.4,
+      "gain": 1
+    },
+    {
+      "file": "off_2000.wav",
+      "rpm": 2000,
+      "layer": "off",
+      "loopStart": 0.1,
+      "loopEnd": 0.4,
+      "gain": 1
+    },
+    {
+      "file": "off_4000.wav",
+      "rpm": 4000,
+      "layer": "off",
+      "loopStart": 0.1,
+      "loopEnd": 0.4,
+      "gain": 1
+    },
+    {
+      "file": "off_6000.wav",
+      "rpm": 6000,
+      "layer": "off",
+      "loopStart": 0.1,
+      "loopEnd": 0.4,
+      "gain": 1
+    },
+    {
+      "file": "off_8000.wav",
+      "rpm": 8000,
+      "layer": "off",
+      "loopStart": 0.1,
+      "loopEnd": 0.4,
+      "gain": 1
+    }
+  ]
+}

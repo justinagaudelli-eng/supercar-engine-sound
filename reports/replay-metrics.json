@@ -1,0 +1,115 @@
+{
+  "generatedAt": "2026-10-27T20:43:08.516Z",
+  "launch-to-60": {
+    "durationS": 25.2,
+    "renderMs": 407,
+    "realtimeFactor": 0.0162,
+    "peakDb": -4.34,
+    "rmsDb": -18.67,
+    "clicks": 0,
+    "clickTimesS": [],
+    "shifts": 5,
+    "maxRpm": 8746,
+    "tracking": {
+      "windows": 23,
+      "within3pct": 1,
+      "misses": []
+    }
+  },
+  "highway-merge": {
+    "durationS": 30.2,
+    "renderMs": 478,
+    "realtimeFactor": 0.0158,
+    "peakDb": -4.34,
+    "rmsDb": -17.22,
+    "clicks": 0,
+    "clickTimesS": [],
+    "shifts": 8,
+    "maxRpm": 6525,
+    "tracking": {
+      "windows": 47,
+      "within3pct": 1,
+      "misses": []
+    }
+  },
+  "steady-cruise": {
+    "durationS": 44.2,
+    "renderMs": 658,
+    "realtimeFactor": 0.0149,
+    "peakDb": -4.34,
+    "rmsDb": -19.62,
+    "clicks": 0,
+    "clickTimesS": [],
+    "shifts": 0,
+    "maxRpm": 2460,
+    "tracking": {
+      "windows": 113,
+      "within3pct": 1,
+      "misses": []
+    }
+  },
+  "stop-and-go": {
+    "durationS": 42.2,
+    "renderMs": 641,
+    "realtimeFactor": 0.0152,
+    "peakDb": -4.34,
+    "rmsDb": -18.45,
+    "clicks": 0,
+    "clickTimesS": [],
+    "shifts": 2,
+    "maxRpm": 4582,
+    "tracking": {
+      "windows": 34,
+      "within3pct": 1,
+      "misses": []
+    }
+  },
+  "hard-braking": {
+    "durationS": 17.4,
+    "renderMs": 269,
+    "realtimeFactor": 0.0154,
+    "peakDb": -4.34,
+    "rmsDb": -19.28,
+    "clicks": 0,
+    "clickTimesS": [],
+    "shifts": 6,
+    "maxRpm": 3678,
+    "tracking": {
+      "windows": 28,
+      "within3pct": 1,
+      "misses": []
+    }
+  },
+  "gps-dropout": {
+    "durationS": 34.2,
+    "renderMs": 520,
+    "realtimeFactor": 0.0152,
+    "peakDb": -4.34,
+    "rmsDb": -20.04,
+    "clicks": 0,
+    "clickTimesS": [],
+    "shifts": 10,
+    "maxRpm": 3867,
+    "tracking": {
+      "windows": 58,
+      "within3pct": 1,
+      "misses": []
+    }
+  },
+  "noisy-fixes": {
+    "durationS": 28.2,
+    "renderMs": 433,
+    "realtimeFactor": 0.0153,
+    "peakDb": -4.34,
+    "rmsDb": -17.43,
+    "clicks": 0,
+    "clickTimesS": [],
+    "shifts": 6,
+    "maxRpm": 3799,
+    "tracking": {
+      "windows": 14,
+      "within3pct": 1,
+      "misses": []
+    }
+  }
+}

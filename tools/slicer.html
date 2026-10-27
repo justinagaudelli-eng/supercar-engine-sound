@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Sample Slicer · GT3 RS Engine Sound</title>
+  <link rel="stylesheet" href="../src/tools/slicer.css">
+</head>
+<body>
+  <header class="top">
+    <a class="back" href="../index.html">← Back to the engine</a>
+    <h1>Rev-sweep sample slicer</h1>
+    <p class="lede">
+      Load one recording of a rev sweep. The slicer finds the time each target RPM is reached, cuts a
+      loop of whole firing cycles there (start and end on rising zero crossings), and gives you WAV loops plus
+      a <code>manifest.json</code> for <code>public/samples/</code>. Everything runs in this browser; nothing is uploaded.
+    </p>
+  </header>
+
+  <main class="slicer">
+    <section class="card">
+      <h2>1 · Recording</h2>
+      <div class="grid">
+        <label class="wide">Audio file
+          <input id="file" type="file" accept="audio/*,.wav,.mp3,.m4a,.aac,.ogg,.flac,.webm">
+        </label>
+        <label>Output sample rate
+          <select id="rate">
+            <option value="source">Keep source (WAV) / 48000</option>
+            <option value="44100">44100 Hz</option>
+            <option value="48000">48000 Hz</option>
+          </select>
+        </label>
+        <label>Channels
+          <select id="channels">
+            <option value="mono">Mono mixdown</option>
+            <option value="keep">Keep source channels</option>
+          </select>
+        </label>
+      </div>
+      <p id="file-info" class="muted">No file loaded.</p>
+    </section>
+
+    <section class="card">
+      <h2>2 · RPM over time</h2>
+      <div class="grid">
+        <label>Sweep start (s) <input id="trim-start" type="number" min="0" step="0.01" value="0"></label>
+        <label>Sweep end (s) <input id="trim-end" type="number" min="0" step="0.01" value="0"></label>
+        <div class="buttons"><button id="btn-trim" type="button">Detect silence</button></div>
+      </div>
+      <fieldset class="grid">
+        <legend>RPM source</legend>
+        <label class="radio"><input type="radio" name="rpm-mode" value="manual" checked> Manual: linear from start to end RPM</label>
+        <label class="radio"><input type="radio" name="rpm-mode" value="estimated"> Pitch tracking (Estimate)</label>
+        <label>Start RPM <input id="rpm-start" type="number" min="300" max="12000" step="50" value="1500"></label>
+        <label>End RPM <input id="rpm-end" type="number" min="300" max="12000" step="50" value="9000"></label>
+        <div class="buttons"><button id="btn-estimate" type="button">Estimate</button></div>
+        <label>Detected pitch is…
+          <select id="order">
+            <option value="3">the firing frequency (rpm ÷ 20)</option>
+            <option value="1.5">half the firing frequency (RPM ×2)</option>
+            <option value="6">double the firing frequency (RPM ×½)</option>
+            <option value="1">once per revolution (RPM ×3)</option>
+          </select>
+        </label>
+        <label>Track from RPM <input id="min-rpm" type="number" min="200" max="5000" step="100" value="700"></label>
+        <label>Track to RPM <input id="max-rpm" type="number" min="3000" max="14000" step="100" value="10000"></label>
+      </fieldset>
+      <div class="canvas-wrap"><canvas id="curve" aria-label="Waveform and RPM curve"></canvas></div>
+      <p class="muted small">Grey: waveform. Orange: RPM curve. Ticks along the bottom: cut loops (green = on, blue = off). Shaded: outside the sweep.</p>
+    </section>
+
+    <section class="card">
+      <h2>3 · Loops</h2>
+      <div class="grid">
+        <label>RPM step <input id="rpm-step" type="number" min="50" max="2000" step="50" value="500"></label>
+        <label>From RPM <input id="range-from" type="number" min="0" step="50" placeholder="auto"></label>
+        <label>To RPM <input id="range-to" type="number" min="0" step="50" placeholder="auto"></label>
+        <label>Loop length
+          <select id="len-mode">
+            <option value="seconds">seconds (target)</option>
+            <option value="cycles">firing cycles</option>
+          </select>
+        </label>
+        <label>Length value <input id="len-value" type="number" min="0.02" step="0.01" value="0.3"></label>
+        <label>Layer
+          <select id="layer">
+            <option value="auto">Auto: rising = on, falling = off</option>
+            <option value="on">All “on” (throttle)</option>
+            <option value="off">All “off” (overrun)</option>
+          </select>
+        </label>
+        <label>Seam crossfade
+          <select id="seam">
+            <option value="auto">When needed</option>
+            <option value="always">Always</option>
+            <option value="off">Never</option>
+          </select>
+        </label>
+        <label>Peak level (dBFS) <input id="peak-db" type="number" min="-24" max="0" step="0.5" value="-1"></label>
+        <label>Set name <input id="set-name" type="text" value="my-gt3rs" maxlength="60"></label>
+        <label class="check"><input id="engine-cycles" type="checkbox" checked> Whole engine cycles (multiples of 6 firings)</label>
+        <label class="check"><input id="flatten" type="checkbox" checked> Flatten pitch inside each loop (needs a good RPM curve)</label>
+      </div>
+      <div class="buttons">
+        <button id="btn-cut" type="button" class="primary">Cut loops</button>
+        <button id="btn-preview" type="button">Preview sweep</button>
+        <button id="btn-stop" type="button">Stop</button>
+        <button id="btn-zip" type="button" class="primary">Download ZIP</button>
+        <button id="btn-manifest" type="button">Download manifest only</button>
+      </div>
+      <p id="status" class="status" role="status"></p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>File</th><th>RPM</th><th>At (s)</th><th>Cycles</th><th>Length</th><th>Seam</th><th>Pitch drift</th><th></th></tr>
+          </thead>
+          <tbody id="loops"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="../src/tools/slicer.js"></script>
+</body>
+</html>

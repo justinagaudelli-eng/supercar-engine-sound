@@ -1,0 +1,44 @@
+[
+  {
+    "name": "launch-to-60",
+    "description": "Stopped 3 s, full-throttle launch to 60 mph in ~4 s, hold, ease off.",
+    "file": "launch-to-60.json",
+    "durationS": 21
+  },
+  {
+    "name": "highway-merge",
+    "description": "Cruise 35 mph on a ramp, hard acceleration to 70 mph, settle into highway cruise.",
+    "file": "highway-merge.json",
+    "durationS": 26
+  },
+  {
+    "name": "steady-cruise",
+    "description": "Steady 45 mph cruise with small speed wander (light load).",
+    "file": "steady-cruise.json",
+    "durationS": 40
+  },
+  {
+    "name": "stop-and-go",
+    "description": "Traffic: crawl, stop, creep, 20 mph, stop — repeatedly.",
+    "file": "stop-and-go.json",
+    "durationS": 38
+  },
+  {
+    "name": "hard-braking",
+    "description": "Cruise 65 mph, then threshold braking to a stop (~1 g), idle.",
+    "file": "hard-braking.json",
+    "durationS": 13.2
+  },
+  {
+    "name": "gps-dropout",
+    "description": "Cruise 50 mph, 12 s tunnel with no fixes, signal returns at 50 mph.",
+    "file": "gps-dropout.json",
+    "durationS": 30
+  },
+  {
+    "name": "noisy-fixes",
+    "description": "Accelerating 20→55 mph with no Doppler speed (positions only), 12 m noise and outliers.",
+    "file": "noisy-fixes.json",
+    "durationS": 24
+  }
+]

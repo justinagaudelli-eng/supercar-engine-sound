@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0c0e">
+  <meta name="color-scheme" content="dark">
+  <title>GT3 RS Engine Sound</title>
+  <link rel="stylesheet" href="./src/ui/styles.css">
+</head>
+<body>
+  <main id="app" class="app">
+    <section class="gauge-panel" aria-label="Instruments">
+      <div class="tach-wrap">
+        <canvas id="tach" role="img" aria-label="Tachometer, gear and speed"></canvas>
+      </div>
+      <div id="gps-status" class="gps-status" data-status="waiting" role="status">
+        <span class="status-dot" aria-hidden="true"></span>
+        <span id="gps-status-text">GPS · waiting</span>
+      </div>
+    </section>
+
+    <section id="controls" class="control-panel" aria-label="Controls">
+      <div id="message" class="message" role="alert" hidden></div>
+
+      <button id="btn-engine" class="btn btn-engine" type="button" data-state="off">Start Engine</button>
+
+      <div class="slider-row">
+        <label for="volume">Volume</label>
+        <input id="volume" type="range" min="0" max="100" step="1" value="70">
+        <output id="volume-value" for="volume">70</output>
+      </div>
+      <div class="slider-row">
+        <label for="mix">Synth ↔ Sample</label>
+        <input id="mix" type="range" min="0" max="100" step="1" value="0">
+        <output id="mix-value" for="mix">0</output>
+      </div>
+
+      <div class="field">
+        <span class="field-label" id="preset-label">Sound</span>
+        <div id="preset" class="segmented" role="group" aria-labelledby="preset-label">
+          <button type="button" data-value="street">Street</button>
+          <button type="button" data-value="track">Track</button>
+          <button type="button" data-value="cabin">Cabin</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="field-label" id="source-label">Input</span>
+        <div id="source" class="segmented" role="group" aria-labelledby="source-label">
+          <button type="button" data-value="gps">GPS</button>
+          <button type="button" data-value="sim">Simulator</button>
+          <button type="button" data-value="replay">Replay</button>
+        </div>
+      </div>
+
+      <div id="sim-panel" class="mode-panel" hidden>
+        <div class="sim-pedals">
+          <div id="sim-brake" class="vslider vslider-brake" role="slider" tabindex="0"
+               aria-label="Brake" aria-orientation="vertical"
+               aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <div class="vslider-fill"></div>
+            <span class="vslider-label">Brake</span>
+            <span class="vslider-value">0%</span>
+          </div>
+          <div id="sim-throttle" class="vslider vslider-throttle" role="slider" tabindex="0"
+               aria-label="Throttle" aria-orientation="vertical"
+               aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <div class="vslider-fill"></div>
+            <span class="vslider-label">Throttle</span>
+            <span class="vslider-value">0%</span>
+          </div>
+        </div>
+        <button id="btn-free-rev" class="btn" type="button">Rev in neutral (parked) — hold</button>
+        <label class="check">
+          <input id="release-to-zero" type="checkbox" checked>
+          <span>Pedals spring back when released</span>
+        </label>
+      </div>
+
+      <div id="replay-panel" class="mode-panel" hidden>
+        <label class="field-label" for="replay-fixture">Recorded drive</label>
+        <select id="replay-fixture" class="select">
+          <option value="">— choose a fixture —</option>
+        </select>
+        <div class="btn-row">
+          <label class="btn file-btn">
+            Load JSON file
+            <input id="replay-file" type="file" accept=".json,application/json">
+          </label>
+          <button id="btn-replay-play" class="btn" type="button">Play</button>
+          <button id="btn-replay-stop" class="btn" type="button">Stop</button>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button id="btn-record" class="btn btn-toggle" type="button" aria-pressed="false">
+          <span class="rec-dot" aria-hidden="true"></span><span id="record-label">Record drive</span>
+        </button>
+        <button id="btn-tone" class="btn btn-toggle" type="button" aria-pressed="false">Test tone</button>
+      </div>
+
+      <details class="settings">
+        <summary>Settings</summary>
+        <div class="field">
+          <span class="field-label" id="units-label">Speed units</span>
+          <div id="units" class="segmented" role="group" aria-labelledby="units-label">
+            <button type="button" data-value="mph">mph</button>
+            <button type="button" data-value="kmh">km/h</button>
+          </div>
+        </div>
+        <div class="field">
+          <span class="field-label" id="route-label">Audio output</span>
+          <div id="output-route" class="segmented" role="group" aria-labelledby="route-label">
+            <button type="button" data-value="direct">Web Audio</button>
+            <button type="button" data-value="mediaElement">Media element</button>
+          </div>
+          <p class="hint">Try “Media element” if the sound stops when the browser is in the background.</p>
+        </div>
+        <p class="hint"><a href="./tools/slicer.html">Sample slicer tool →</a></p>
+      </details>
+    </section>
+
+    <section id="debug" class="debug" aria-label="Debug"></section>
+  </main>
+
+  <div id="resume-overlay" class="resume-overlay" hidden>
+    <button id="btn-resume" type="button">Tap to resume audio</button>
+  </div>
+
+  <noscript><p class="noscript">This app needs JavaScript.</p></noscript>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
