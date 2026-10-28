@@ -40,14 +40,16 @@ moving (step 5) so you can replay the drive at your desk afterwards.
     - If audio stopped in the background: open **Settings → Audio output → Media element** and
       repeat this step.
 11. **Shift into Reverse** (camera view takes over the screen). Does the audio continue?
-12. **Tunnel or parking garage**, if you pass one. The status should show `stale`, then `lost` and
-    decay to idle, then recover smoothly when the signal returns.
+12. **Tunnel or parking garage**, if you pass one. At speed the status should show `stale` and hold
+    the revs for up to 20 s. Below ~34 mph it shows `lost` after 6 s and decays to idle. When the
+    signal returns it should recover smoothly.
 13. **At the end, tap Record drive again** to stop. The JSON downloads (or appears in the
     browser's downloads).
-    - If the Tesla browser won't download files, note it. You can still test with the bundled
-      replays at your desk.
-14. **Tap Stop.** You should hear a shutdown. Park and leave the car. Next drive, does the page
-    remember your settings (volume, preset, input)?
+    - If the Tesla browser won't download files, note it. The drive is still saved in the
+      browser and appears at the top of the **Replay** list.
+14. **Tap Stop.** You should hear a shutdown, then the app releases the audio. Does your previous
+    music/radio source resume (or can you resume it)? Next drive, does the page remember your
+    settings (volume, preset, input)?
 
 **Report back:** the GPS update rate and accuracy you saw; how much lag (seconds) there was
 between the car and the sound; and the answers to 6, 8, 10 and 11. Those decide what to tune

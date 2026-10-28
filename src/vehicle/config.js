@@ -44,6 +44,8 @@ export const vehicleConfig = {
     minShiftIntervalS: 0.7,     // never shift again sooner than this (anti-hunt)
     kickdownIntervalS: 0.25,    // consecutive kickdowns can come faster
     brakingShiftIntervalS: 0.32, // consecutive downshifts under braking
+    reverseShiftIntervalS: 1.6, // up-after-down or down-after-up needs this long (anti-hunt)
+    kickdownHoldS: 1.5,         // after a kickdown, hold the gear this long (unless at redline)
     upshiftTimeS: 0.11,         // PDK upshift: rpm drop duration
     downshiftTimeS: 0.16,       // downshift: blip + settle
     blipOvershootRpm: 260,      // rev-match blip overshoots the target slightly
@@ -61,6 +63,7 @@ export const vehicleConfig = {
   load: {
     attackS: 0.12,              // load smoothing (rising)
     releaseS: 0.25,             // load smoothing (falling)
+    shiftTauS: 0.8,             // slower load used for shift decisions (ignores accel noise)
   },
 
   startup: {

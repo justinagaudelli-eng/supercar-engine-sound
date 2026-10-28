@@ -14,10 +14,21 @@ Judgment calls made while building autonomously. Each: what was chosen, why, and
 4. **Kalman filter on [speed, accel] (constant-acceleration model)** rather than an alpha-beta filter. Why: it handles irregular intervals (1 Hz GPS with jitter, 50–60 Hz simulator) and a per-measurement noise level (Doppler vs position-derived speed) naturally. Alt: alpha-beta has fixed gains, which suit only one update rate.
 5. **Extrapolation fades the acceleration term** (`v = v0 + a·τ·(1−e^(−dt/τ))`, τ = 1.2 s). Why: pure constant-accel extrapolation overshoots badly when a fix is late. Alt: hold speed between fixes — that gives a staircase RPM.
 6. **Glide-on-correction instead of snapping.** When a fix arrives, the visible speed glides from where it was onto the new track (τ = 0.35 s), never faster than 6 m/s² (so leaving a tunnel ramps instead of jumping). Why: this removes the 1 Hz "step" with minimal added lag. Alt: low-pass the output, which adds lag all the time.
-7. **Position-derived speed is timestamped at the interval midpoint**, and arrival time is tracked separately (`receivedAt`). Why: distance/time is the *average* speed over the interval; timestamping it at arrival added ~0.5 s of lag. Arrival time still drives staleness and gliding.
-8. **Derived-speed noise = 0.25 × combined fix accuracy / dt** (floor 0.8 m/s). Why: GPS position errors are strongly correlated between consecutive fixes, so the naive √2·accuracy/dt is far too pessimistic and caused ~5 mph of lag on the noisy fixture. Tunable: `derivedSigmaFactor`.
-9. **Outlier rejection: accuracy > 50 m, speed > 100 m/s, implied |accel| > 15 m/s².** After 3 consecutive rejects the next fix is accepted (re-anchor), so a genuine change isn't rejected forever.
-10. **Dropout policy: hold for 2.5 s ("stale"), then decay toward zero with τ = 4 s from 6 s ("lost").** This follows the spec's "hold then decay to idle". Alt: hold forever — in a long tunnel the engine would drone at a stale RPM.
+7. **Position-derived speed (no Doppler) is a least-squares velocity fit over the last 4 s of fixes**, timestamped at the window's centre. Arrival time is tracked separately (`receivedAt`) and still drives staleness and gliding.
+   - The first version used distance/time between two fixes. The independent review showed it hunted gears and revved the engine while parked (white jitter).
+   - A median filter on top added lag and still let outliers in.
+   - The fit uses every fix, so it averages jitter, and it is unbiased under constant acceleration.
+   - Its own uncertainty gives a statistical "standing still" test: speed below 2σ = 0, with 1.6× hysteresis once stopped.
+   - Alt: windowed two-point differences plus a median — rejected after measurement.
+8. **Position noise per axis = 0.4 × reported accuracy** (speed sigma floor 0.8 m/s). Why: GPS errors are strongly correlated between nearby fixes, so treating reported accuracy as independent noise is far too pessimistic. Tunable: `derivedSigmaFactor`.
+   - Cost: positions-only speed lags about 1 s more than Doppler (median error ≤ 5 mph on the hostile noisy fixture). That was accepted in exchange for a stable idle and no hunting.
+9. **Outlier rejection:**
+   - Reject accuracy > 50 m, speed > 100 m/s, or implied |accel| > 15 m/s².
+   - Positions-only fixes also go through a *vector* gate: reject a fix that lands farther from where the last fitted velocity predicts than ½·a·dt² + accuracy. A magnitude-only check let sideways multipath jumps through.
+   - After 3 consecutive rejects the next fix is accepted (re-anchor), so a genuine change isn't rejected forever.
+10. **Dropout policy: hold for 2.5 s ("stale"), then decay toward zero with τ = 4 s from 6 s ("lost").** Above 15 m/s (~34 mph) the hold lasts 20 s, because at speed a dropout is almost always a tunnel. When the signal returns the catch-up glide runs at up to 12 m/s² instead of 6.
+    - Why: the spec says "hold then decay to idle". The review pointed out that decaying at 70 mph and then gliding back up sounds like a phantom acceleration run.
+    - Alt: hold forever — in a long tunnel the engine would drone at a stale RPM.
 11. **Load is estimated from acceleration with a speed-dependent full-throttle threshold** (3.2 m/s² near standstill → 1.4 m/s² at 35 m/s), plus a cruise load that rises with v² (aero). Why: a Tesla's acceleration at full pedal falls off with speed much like a car's; without this, highway overtakes would read as part throttle.
 12. **The simulator reports throttle directly** and the bus uses it as load (the GPS path estimates it). Why: desk testing should feel responsive. The simulator still goes through the same filter + RPM model.
 13. **Replay feeds raw fixes through the same `GpsFixProcessor` as live GPS**, so recorded drives exercise identical code. Recordings save raw fixes (`{t, lat, lon, speed, accuracy, heading}`), not processed samples.
@@ -45,3 +56,27 @@ Judgment calls made while building autonomously. Each: what was chosen, why, and
 
 24. **Research findings merged into one `RESEARCH.md`** with §1–§4, keeping every source link and confidence marker.
 25. **CC samples are listed, not bundled** (spec). The top pick for slicing is jerry.berumen's CC BY 4.0 911 revving clip.
+
+## Independent review follow-ups (see reports/SUMMARY.md §4)
+
+26. **Doppler "0 while moving" detection.** Older Intel Teslas reportedly give `coords.speed = 0` while driving.
+    - After 3 *consecutive* fixes where Doppler says 0 but the full-window position fit says > 2.5 m/s, and Doppler hasn't itself reported motion in the last ~6 s (so it isn't a real stop), Doppler is ignored for the session.
+    - Alt: always prefer positions — that throws away the far better Doppler on newer cars.
+27. **Anti-hunt rules:**
+    - Shift decisions use a slower-smoothed load (τ 0.8 s). The upshift point uses max(fast, slow) load, so a spike can only delay an upshift; the downshift point uses the slow load, so a spike can't trigger one.
+    - Reversing shift direction needs 1.6 s since the last shift, even under braking. A kickdown holds its gear for 1.5 s unless at the full-throttle shift point.
+    - Cost: a hard stop within 1.6 s of an upshift delays its first downshift slightly.
+28. **Load is 0 when stopped** (< 0.6 m/s and accel < 0.6 m/s²), so GPS jitter at a red light can't trigger the launch clutch-slip revs.
+29. **Stop suspends the AudioContext** ~1.7 s after the shutdown sound. This releases the car's media source (your music can resume) and the CPU. Start resumes the same context and engine; it never builds a second one.
+30. **Audio watchdog instead of trusting `ctx.state`.** If audio time advances less than half as fast as wall time for 2 s while the page is visible, or the media element pauses, the "Tap to resume" overlay appears. Why: the car can silence a page whose context still reports 'running'.
+31. **Reload recovery.** A session marker in localStorage (10-minute window) means that after a mid-drive reload, one tap resumes straight to idle with no cranking.
+    - Audio still needs that tap: browsers forbid starting audio without a gesture, so a fully automatic resume is impossible.
+32. **Recordings are crash-safe.** The in-progress trace is flushed to localStorage every 10 s and recovered after a reload. The last 3 finished recordings are kept and listed under Replay, as well as downloaded.
+    - Alt (from the review): QR-code export. Deferred: download plus in-car replay covers the first drives.
+33. **Default audio route stays `direct`; `mediaElement` is an option.** It can't be A/B tested at a desk. The checklist (step 10) tells you to switch if background audio stops. Route changes apply on the next Start Engine.
+    - Alt: default to mediaElement — riskier, because `play()` outside a fresh gesture can be rejected. It does fall back to direct with a message.
+34. **Tach at DPR 1 and 30 fps.** The car's GPU/CPU is the bottleneck, and the gauge is read at arm's length.
+35. **Stereo synth.** Exhaust banks are panned L/R and the intake is slightly wide. All analysis runs on the mono sum, so the mix stays mono-compatible.
+36. **The audio agent's run ended early (API rate limit)** after it had implemented all eight requested audio fixes. I verified the work by re-running the full audio suite, which passed. Its last in-progress extra tests (gap/resume, mediaElement fallback) were not added; the e2e lifecycle tests cover resume.
+37. **Publishing to GitHub was blocked by this session's permission policy** (creating a public repo is treated as an outward-facing action). Everything is committed locally; the README and the final message give the exact commands.
+

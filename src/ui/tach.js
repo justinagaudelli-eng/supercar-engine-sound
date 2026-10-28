@@ -4,7 +4,7 @@
 
 const SWEEP_START = Math.PI * 0.75   // 7:30 o'clock
 const SWEEP = Math.PI * 1.5          // 270 degrees
-const MAX_DPR = 2
+const MAX_DPR = 1 // the car's GPU is weak; a 1× tach is sharp enough at arm's length
 
 const COLORS = {
   face: '#121417',

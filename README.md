@@ -72,6 +72,9 @@ Test changes at a desk with **Simulator** (throttle/brake pads plus "Rev in neut
 
 - Select **GPS**, tap **Record drive**, drive, and tap it again. A `drive-<timestamp>.json` file
   downloads. It holds the raw GPS fixes: time, position, speed and accuracy.
+- The recording is also saved in the browser while you drive (every 10 s, so a page reload
+  doesn't lose it), and your last 3 recordings appear at the top of the **Replay** list. That
+  works even if the car's browser can't download files.
 - At your desk, select **Replay** and either choose a bundled fixture or **Load JSON** with your
   recording, then tap **Play**. Replay feeds the fixes through exactly the same pipeline as live
   GPS (fix rejection → Kalman filter → gearbox → synth).

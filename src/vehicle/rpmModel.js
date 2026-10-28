@@ -15,7 +15,10 @@ export function createRpmModel(cfg, { seed = 1 } = {}) {
   let rpm = 0
   let gear = 1
   let gearChosen = false     // false until we've picked a gear for the current speed
-  let load = 0               // smoothed load
+  let load = 0               // smoothed load (sound)
+  let shiftLoad = 0          // slower-smoothed load for shift decisions (ignores accel noise)
+  let lastShiftType = null
+  let kickdownUntil = -Infinity
   let lastShiftT = -Infinity
   let shift = null           // { type, from, toGear, t0, dur, startRpm }
   let limiterPhase = 0
@@ -69,6 +72,7 @@ export function createRpmModel(cfg, { seed = 1 } = {}) {
     const dur = type === 'upshift' ? S.upshiftTimeS : S.downshiftTimeS
     shift = { type, from: gear, toGear, t0: t, dur, startRpm }
     events.push({ type, from: gear, to: toGear, load })
+    lastShiftType = type
     gear = toGear
     lastShiftT = t
   }
@@ -79,15 +83,23 @@ export function createRpmModel(cfg, { seed = 1 } = {}) {
     const cur = coupledRpm(speed, gear, GB)
     const braking = accel <= S.brakingAccelMps2
     // Under braking PDK holds lower gears (engine braking + blips), so the ceiling rises.
-    const up = braking ? Math.max(upshiftRpm(load), S.brakingUpshiftFloorRpm) : upshiftRpm(load)
+    // Upshift point: noise spikes in load may only delay an upshift (max of fast/slow);
+    // downshift point: uses the slow load so a spike can't trigger one.
+    const upLoad = Math.max(load, shiftLoad)
+    const up = braking ? Math.max(upshiftRpm(upLoad), S.brakingUpshiftFloorRpm) : upshiftRpm(upLoad)
     // Current gear is physically impossible (speed appeared suddenly, e.g. GPS lock while
     // rolling): select the right gear silently instead of cascading through shifts.
     if (cur > E.limiterRpm + 300) {
-      gear = bestGear(speed, downshiftRpm(load, accel) + S.hysteresisRpm * 0.5, up, GB)
+      gear = bestGear(speed, downshiftRpm(shiftLoad, accel) + S.hysteresisRpm * 0.5, up, GB)
       return
     }
-    // Upshift
-    if (gear < topGear && cur >= up && since >= S.minShiftIntervalS * 0.5) {
+    // Changing direction (up after down or vice versa) needs a longer pause: anti-hunt.
+    const reverseOk = (type) => lastShiftType == null || lastShiftType === type || since >= S.reverseShiftIntervalS
+    // Upshift: a full-throttle run may shift as soon as the next gear is ready; otherwise
+    // respect the minimum interval and any kickdown hold.
+    const flatOut = cur >= S.upshiftFullRpm - 50
+    if (gear < topGear && cur >= up && (flatOut ||
+        (since >= S.minShiftIntervalS && t >= kickdownUntil && reverseOk('upshift')))) {
       beginShift('upshift', gear + 1, rpm, events)
       return
     }
@@ -100,14 +112,15 @@ export function createRpmModel(cfg, { seed = 1 } = {}) {
     const lower = coupledRpm(speed, gear - 1, GB)
     const landsOk = lower <= up - S.hysteresisRpm
     // Kickdown: lots of throttle and a lower gear has room to pull.
-    if (load >= S.kickdownLoad && lower <= S.kickdownTargetRpm && landsOk &&
-        since >= S.kickdownIntervalS) {
+    if (load >= S.kickdownLoad && shiftLoad >= S.kickdownLoad * 0.7 && lower <= S.kickdownTargetRpm &&
+        landsOk && since >= S.kickdownIntervalS) {
       beginShift('downshift', gear - 1, rpm, events)
+      kickdownUntil = t + S.kickdownHoldS
       return
     }
     // Normal / braking downshift when revs sag.
     const interval = braking ? S.brakingShiftIntervalS : S.minShiftIntervalS
-    if (cur < downshiftRpm(load, accel) && landsOk && since >= interval) {
+    if (cur < downshiftRpm(shiftLoad, accel) && landsOk && since >= interval && reverseOk('downshift')) {
       beginShift('downshift', gear - 1, rpm, events)
     }
   }
@@ -199,6 +212,7 @@ export function createRpmModel(cfg, { seed = 1 } = {}) {
     reset() {
       state = 'off'; t = 0; stateT = 0; rpm = 0; gear = 1; gearChosen = false; load = 0
       lastShiftT = -Infinity; shift = null; limiterActive = false; catchT = null
+      shiftLoad = 0; lastShiftType = null; kickdownUntil = -Infinity
     },
     /** Jump straight to running (tests, page reload while driving). */
     forceRunning() { state = 'running'; stateT = 0; rpm = E.idleRpm; catchT = null },
@@ -209,6 +223,7 @@ export function createRpmModel(cfg, { seed = 1 } = {}) {
       t += dt; stateT += dt
       const target = clamp01(input.load ?? 0)
       load += (target - load) * onePole(dt, target > load ? cfg.load.attackS : cfg.load.releaseS)
+      shiftLoad += (target - shiftLoad) * onePole(dt, cfg.load.shiftTauS)
 
       const frame = {
         rpm: 0, gear: 0, load, throttle: target, cut: 0, combustion: 0, starter: 0,

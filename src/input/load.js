@@ -10,6 +10,8 @@ export function estimateLoad(speedMps, accelMps2, cfg) {
   // Aero drag grows with v^2, so holding speed needs more throttle at speed.
   const cruise = speedMps < 0.5 ? 0 : lerp(cfg.cruiseBase, cfg.cruiseAtRef, s * s)
   const a = accelMps2 ?? 0
+  // Standing still without real acceleration (parked GPS jitter): no throttle.
+  if (speedMps < cfg.stoppedSpeedMps && a < cfg.launchAccelMps2) return 0
 
   if (a >= cfg.deadbandMps2) {
     return clamp01(cruise + (1 - cruise) * clamp01((a - cfg.deadbandMps2) / (fullAccel - cfg.deadbandMps2)))

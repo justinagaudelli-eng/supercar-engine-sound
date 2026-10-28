@@ -63,3 +63,27 @@ describe('every fixture through replay → filter → rpm model', () => {
     })
   }
 })
+
+// Older Teslas often give no Doppler speed: every fixture again with positions only.
+describe('every fixture with coords.speed = null (positions only)', () => {
+  for (const { name, file } of index) {
+    it(`${name}: no hunting, rpm bounded`, () => {
+      const trace = load(file)
+      const stripped = { ...trace, fixes: trace.fixes.map((f) => ({ ...f, speed: null })) }
+      const timeline = traceToTimeline(stripped, { fps: 100, withStartup: true })
+      const running = timeline.filter((x) => x.t > 3)
+      const shifts = running.flatMap((x) => x.frame.events.filter((e) => e.type === 'upshift' || e.type === 'downshift')
+        .map((e) => ({ ...e, t: x.t })))
+      for (let i = 1; i < shifts.length; i++) {
+        const a = shifts[i - 1], b = shifts[i]
+        if (a.type !== b.type) expect(b.t - a.t, `${name}: ${a.type}@${a.t.toFixed(2)} then ${b.type}@${b.t.toFixed(2)}`).toBeGreaterThan(1.5)
+      }
+      // No more shifts than the Doppler version needs, plus a small allowance.
+      const withDoppler = traceToTimeline(trace, { fps: 100, withStartup: true })
+        .flatMap((x) => x.frame.events).filter((e) => e.type === 'upshift' || e.type === 'downshift').length
+      expect(shifts.length, `${name}: shift count`).toBeLessThanOrEqual(withDoppler + 4)
+      for (const { frame } of running) expect(frame.rpm).toBeLessThanOrEqual(E.limiterRpm)
+    })
+  }
+})
+

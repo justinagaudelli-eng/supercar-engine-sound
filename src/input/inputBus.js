@@ -36,7 +36,9 @@ export function createInputBus(cfg) {
       if (filter.initialized && tMs / 1000 < filter.lastT) return // out of order
       if (lastSampleMs != null && arrival < lastSampleMs) return
       // Visible speed right now (before the update), so we can glide from it.
-      const before = filter.initialized ? compute(arrival).speedMps : null
+      const beforeOut = filter.initialized ? compute(arrival) : null
+      const before = beforeOut ? beforeOut.speedMps : null
+      const wasLost = beforeOut?.status === 'lost'
 
       const sigma = sample.speedSigma ?? Math.max(0.3, (sample.accuracy ?? 5) * 0.1)
       filter.update(tMs / 1000, sample.speedMps, sigma, sample.accelMps2)
@@ -45,7 +47,9 @@ export function createInputBus(cfg) {
       if (before != null) {
         offsetV = before - modelAt(arrival).v
         // Big corrections (e.g. leaving a tunnel) glide no faster than maxGlideAccel.
-        offsetTauS = Math.max(cfg.filter.blendTauS, Math.abs(offsetV) / cfg.filter.maxGlideAccelMps2)
+        // After a lost signal, catch up faster (we already know we were wrong).
+        const glide = wasLost ? cfg.filter.recoverGlideAccelMps2 : cfg.filter.maxGlideAccelMps2
+        offsetTauS = Math.max(cfg.filter.blendTauS, Math.abs(offsetV) / glide)
       } else {
         offsetV = 0
       }
@@ -84,7 +88,10 @@ export function createInputBus(cfg) {
         v = Math.max(0, v + offsetV * k)
       }
 
-      if (ageMs >= cfg.dropout.lostMs) {
+      // At speed a dropout is almost always a tunnel or overpass: hold much longer.
+      const heldSpeed = lastOut ? lastOut.speedMps : v
+      const lostMs = heldSpeed >= cfg.dropout.highSpeedMps ? cfg.dropout.lostMsHighSpeed : cfg.dropout.lostMs
+      if (ageMs >= lostMs) {
         status = 'lost'
         if (lostFromMs == null) {
           lostFromMs = nowMs

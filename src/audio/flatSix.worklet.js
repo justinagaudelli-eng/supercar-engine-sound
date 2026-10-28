@@ -3,9 +3,14 @@
 // Model (RESEARCH.md §2): a crank-angle phase accumulator integrates the per-sample-smoothed
 // rpm. Six cylinders fire every 120° (order 1-6-2-4-3-5); each firing launches a combustion
 // pulse into its bank. Bank pulse trains → header combs → collector/main pipe comb → muffler
-// combs (flap) → tailpipe comb → rpm/load lowpass = EXHAUST. Slower induction pulses ×
-// (tone + noise) → plenum/runner band-passes = INTAKE. Higher orders, valve ticks and the
-// starter motor = MECH. Output: 1 output with 3 channels [exhaust, intake, mech].
+// combs (flap) → twin tailpipe combs → rpm/load lowpass = EXHAUST. Slower induction pulses ×
+// (tone + noise) → plenum/howl/runner band-passes = INTAKE. Higher orders, valve ticks and the
+// starter motor = MECH.
+//
+// Output: 1 output, 5 channels, mid/side per voice so the mono sum is exactly the mid:
+//   [0] exhaust mid  [1] exhaust side  [2] intake mid  [3] intake side  [4] mech (centre)
+// Exhaust side = difference of the two tailpipes + bank-A/B header difference; intake side =
+// decorrelated induction air. The mixer builds L = mid + w·side, R = mid − w·side.
 //
 // AudioParams (k-rate; smoothed per sample here): rpm, load, cut, combustion, starter.
 // All tunables arrive via processorOptions.config (src/audio/config.js → worklet block).
@@ -13,6 +18,8 @@
 
 const TWO_PI = Math.PI * 2
 const DEG = Math.PI / 180
+const TINY = 1e-15               // flush-to-zero threshold for decaying states (denormals)
+const ANTI_DENORMAL = 1e-20      // tiny DC injected into feedback loops / filters
 
 const clamp = (x, lo, hi) => (x < lo ? lo : x > hi ? hi : x)
 const smoothstep = (x, lo, hi) => {
@@ -23,29 +30,40 @@ const lerp = (a, b, t) => a + (b - a) * t
 const onePoleCoef = (tauS, sr) => (tauS <= 0 ? 1 : 1 - Math.exp(-1 / (tauS * sr)))
 const decayCoef = (tauS, sr) => Math.exp(-1 / (tauS * sr))
 
-// Feedback comb with a one-pole lowpass in the loop: y[n] = x[n] + g·LP(y[n−L]).
+// Feedback comb with a one-pole lowpass in the loop: y[n] = x[n] + g·LP(y[n−D]).
+// D is fractional and may be scaled per sample (hot-gas speed of sound) — linear-interpolated
+// reads, so a gliding D is a smooth Doppler-like shift, never a jump.
 class Comb {
-  constructor(delayS, feedback, lpHz, sr) {
-    this.len = Math.max(1, Math.round(delayS * sr))
+  constructor(delayS, feedback, lpHz, sr, minScale = 1) {
+    this.base = Math.max(1, delayS * sr)
+    this.len = Math.ceil(this.base) + 3
     this.buf = new Float32Array(this.len)
-    this.idx = 0
+    this.w = 0
     this.g = feedback
     this.c = 1 - Math.exp(-TWO_PI * lpHz / sr)
     this.lp = 0
+    this.minD = Math.max(1, this.base * minScale)
   }
-  tick(x) {
-    const d = this.buf[this.idx]
-    this.lp += this.c * (d - this.lp)
+  tick(x, scale = 1) {
+    let d = this.base * scale
+    if (d < this.minD) d = this.minD
+    const di = d | 0, f = d - di
+    let i0 = this.w - di
+    if (i0 < 0) i0 += this.len
+    let i1 = i0 - 1
+    if (i1 < 0) i1 += this.len
+    const v = this.buf[i0] + f * (this.buf[i1] - this.buf[i0])
+    this.lp += this.c * (v - this.lp) + ANTI_DENORMAL
     const y = x + this.g * this.lp
-    this.buf[this.idx] = y
-    if (++this.idx >= this.len) this.idx = 0
+    this.buf[this.w] = y
+    if (++this.w >= this.len) this.w = 0
     return y
   }
 }
 
 // Topology-preserving-transform state-variable filter (stable under coefficient changes).
 class Svf {
-  constructor() { this.ic1 = 0; this.ic2 = 0; this.a1 = 0; this.a2 = 0; this.a3 = 0; this.k = 1; this.band = 0; this.low = 0 }
+  constructor() { this.ic1 = 0; this.ic2 = 0; this.a1 = 0; this.a2 = 0; this.a3 = 0; this.k = 1; this.band = 0 }
   set(hz, q, sr) {
     const g = Math.tan(Math.PI * clamp(hz, 10, sr * 0.45) / sr)
     this.k = 1 / q
@@ -53,14 +71,14 @@ class Svf {
     this.a2 = g * this.a1
     this.a3 = g * this.a2
   }
+  copy(o) { this.k = o.k; this.a1 = o.a1; this.a2 = o.a2; this.a3 = o.a3 }
   tick(x) {
-    const v3 = x - this.ic2
+    const v3 = x + ANTI_DENORMAL - this.ic2
     const v1 = this.a1 * this.ic1 + this.a2 * v3
     const v2 = this.ic2 + this.a2 * this.ic1 + this.a3 * v3
     this.ic1 = 2 * v1 - this.ic1
     this.ic2 = 2 * v2 - this.ic2
     this.band = v1
-    this.low = v2
     return v2
   }
   // Constant-peak-gain band-pass (unity at the centre frequency).
@@ -69,7 +87,12 @@ class Svf {
 
 class DcBlock {
   constructor(r) { this.r = r; this.x1 = 0; this.y1 = 0 }
-  tick(x) { const y = x - this.x1 + this.r * this.y1; this.x1 = x; this.y1 = y; return y }
+  tick(x) {
+    let y = x - this.x1 + this.r * this.y1
+    if (y < TINY && y > -TINY) y = 0
+    this.x1 = x; this.y1 = y
+    return y
+  }
 }
 
 // C¹ pulse envelope: Σ A·e^(−t/τd)·(1 − e^(−t/τa))² over all triggered pulses. Zero value
@@ -83,13 +106,18 @@ class Env {
     const f0 = Math.pow(this.k0, frac), fa = Math.pow(this.ka, frac)
     this.s0 += amp * f0; this.s1 += amp * f0 * fa; this.s2 += amp * f0 * fa * fa
   }
-  decay() { this.s0 *= this.k0; this.s1 *= this.k1; this.s2 *= this.k2 }
+  decay() {
+    this.s0 *= this.k0; this.s1 *= this.k1; this.s2 *= this.k2
+    if (this.s0 < TINY && this.s0 > -TINY) { this.s0 = 0; this.s1 = 0; this.s2 = 0 }  // denormals
+  }
   value() { return this.s0 - 2 * this.s1 + this.s2 }
 }
 
-// Block-rate controls are ramped linearly across each block (no zipper steps).
-const R_RASP = 0, R_FLAP = 1, R_HOLLOW = 2, R_INTAKE = 3, R_TURB = 4, R_SUP3 = 5, R_SUP6 = 6,
-  R_SUP15 = 7, R_PH3 = 8, R_PH6 = 9, R_PH15 = 10, R_WHINE = 11, R_WOBBLE = 12, R_MECH0 = 13
+// Block-rate controls are ramped linearly across each block (no zipper steps). Support sines
+// are ramped as complex amplitudes (re/im) so phase offsets need no wrap handling.
+const R_RASP = 0, R_FLAP = 1, R_HOLLOW = 2, R_INTAKE = 3, R_TURB = 4,
+  R_S3C = 5, R_S3S = 6, R_S6C = 7, R_S6S = 8, R_S15C = 9, R_S15S = 10,
+  R_WHINE = 11, R_WOBBLE = 12, R_DSCALE = 13, R_MECH0 = 14
 
 class FlatSixProcessor extends AudioWorkletProcessor {
   static get parameterDescriptors() {
@@ -126,23 +154,46 @@ class FlatSixProcessor extends AudioWorkletProcessor {
     this.rpmS = 0; this.loadS = 0; this.cutS = 0; this.combS = 0; this.startS = 0
 
     // Firing order → cylinder per 120° slot, bank per cylinder, fixed imbalance per cylinder.
+    // Gain imbalance is stored as a unit random per cylinder and scaled by an rpm-dependent
+    // spread (lumpier at idle).
     this.cylOfSlot = new Int32Array(6)
     this.bankOfCyl = new Int32Array(7)
     this.imbDeg = new Float64Array(7)
-    this.imbGain = new Float64Array(7)
+    this.imbUnit = new Float64Array(7)
+    this.bankGain = new Float64Array(7)
     for (let s = 0; s < 6; s++) this.cylOfSlot[s] = C.firingOrder[s]
     for (let c = 1; c <= 6; c++) {
       this.bankOfCyl[c] = c >= C.bankBFirstCylinder ? 1 : 0
       const bankB = this.bankOfCyl[c] === 1
       this.imbDeg[c] = (this.rand() * 2 - 1) * C.imbalance.timingDeg + (bankB ? C.bankB.timingDeg : 0)
-      this.imbGain[c] = (1 + (this.rand() * 2 - 1) * C.imbalance.gain) * (bankB ? C.bankB.gain : 1)
+      this.imbUnit[c] = this.rand() * 2 - 1
+      this.bankGain[c] = bankB ? C.bankB.gain : 1
     }
+    this.imbSpread = C.imbalance.gainLo
     this.slotIdx = 0
     this.slotBase = 0               // nominal angle of the next slot
     this.nextFire = this.imbDeg[this.cylOfSlot[0]]
     // crank angle in degrees, 0..720 (one 4-stroke cycle); start just before the first firing
     this.theta = Math.min(0, this.nextFire) - 1
     this.tickAngle = 1e9            // pending second valve tick (crank angle)
+    this.lump = 0                   // slow cycle-to-cycle amplitude wander (AR(1) per firing)
+    this.lumpSigma = 0
+
+    // Crank phasor z = e^{i·1.5θ}; engine order k = 1.5·m is z^m (no per-sample trig).
+    this.zr = 0; this.zi = 0
+    this.resyncPhasor()
+    let maxM = 4
+    this.mechPow = new Int32Array(C.mech.orders.length)
+    this.mechTrig = false
+    for (let i = 0; i < C.mech.orders.length; i++) {
+      const m = C.mech.orders[i] / 1.5
+      if (Math.abs(m - Math.round(m)) > 1e-9) this.mechTrig = true  // fallback: Math.sin
+      this.mechPow[i] = Math.round(m)
+      if (m > maxM) maxM = Math.round(m)
+    }
+    this.nPow = maxM + 1
+    this.powR = new Float64Array(this.nPow)
+    this.powI = new Float64Array(this.nPow)
 
     // Envelopes. Exhaust pulse per bank = (1+u)·D − u·U (U: slower rarefaction tail).
     this.envD = [new Env(), new Env()]
@@ -161,22 +212,29 @@ class FlatSixProcessor extends AudioWorkletProcessor {
     this.rampInc = new Float64Array(this.nRamps)   // per-sample increment
     this.rampTgt = new Float64Array(this.nRamps)   // value at the end of the block
     this.firstBlock = true
+    this.dScale = 1                 // smoothed pipe-delay scale (hot gas → faster sound)
+    this.aDScale = onePoleCoef(C.exhaust.gasTemp.tauS, sr)
 
     // Exhaust pipes.
     const X = C.exhaust
-    this.hdrA = new Comb(X.headerA.delayS, X.headerA.feedback, X.headerA.lpHz, sr)
-    this.hdrB = new Comb(X.headerB.delayS, X.headerB.feedback, X.headerB.lpHz, sr)
-    this.main = new Comb(X.main.delayS, X.main.feedback, X.main.lpHz, sr)
+    const minScale = 1 / (1 + X.gasTemp.amount * 1.2)
+    this.hdrA = new Comb(X.headerA.delayS, X.headerA.feedback, X.headerA.lpHz, sr, minScale)
+    this.hdrB = new Comb(X.headerB.delayS, X.headerB.feedback, X.headerB.lpHz, sr, minScale)
+    this.main = new Comb(X.main.delayS, X.main.feedback, X.main.lpHz, sr, minScale)
     this.muf1 = new Comb(X.muffler1.delayS, X.muffler1.feedback, X.muffler1.lpHz, sr)
     this.muf2 = new Comb(X.muffler2.delayS, X.muffler2.feedback, X.muffler2.lpHz, sr)
-    this.tail = new Comb(X.tail.delayS, X.tail.feedback, X.tail.lpHz, sr)
+    this.tailL = new Comb(X.tail.delayS, X.tail.feedback, X.tail.lpHz, sr)
+    this.tailR = new Comb(X.tail2.delayS, X.tail2.feedback, X.tail2.lpHz, sr)
     this.exLp = new Svf()
+    this.exLpSide = new Svf()
     this.dcPulseA = new DcBlock(C.pulseDcR)
     this.dcPulseB = new DcBlock(C.pulseDcR)
     this.dcEx = new DcBlock(C.dcR)
+    this.dcExS = new DcBlock(C.dcR)
     this.dcIn = new DcBlock(C.dcR)
+    this.dcInS = new DcBlock(C.dcR)
     this.dcMe = new DcBlock(C.dcR)
-    this.turbLp = 0
+    this.turbLp = 0; this.turbLp2 = 0
     this.turbC = 1 - Math.exp(-TWO_PI * C.pulse.turbulenceLpHz / sr)
     this.turbNorm = 1 / Math.sqrt(this.turbC / (2 - this.turbC) / 3)  // → unit RMS
     this.raspHpLp = 0
@@ -189,11 +247,11 @@ class FlatSixProcessor extends AudioWorkletProcessor {
     this.plenum = new Svf(); this.plenum.set(C.intake.plenum.hz, C.intake.plenum.q, sr)
     this.runner = new Svf()
     this.howl = new Svf()
+    this.inSide = new Svf(); this.inSide.set(C.intake.side.hz, C.intake.side.q, sr)
     this.inDirect = 0
     this.inDirectC = 1 - Math.exp(-TWO_PI * C.intake.directLpHz / sr)
 
-    // Mech.
-    // two cascaded band-passes: steep skirts so a tick is a 'tik', not a full-band click
+    // Mech: two cascaded band-passes so a tick is a 'tik', not a full-band click.
     this.tickBp = new Svf(); this.tickBp.set(C.mech.tick.bpHz, C.mech.tick.q, sr)
     this.tickBp2 = new Svf(); this.tickBp2.set(C.mech.tick.bpHz, C.mech.tick.q, sr)
     this.envTick.set(decayCoef(C.mech.tick.decayS, sr), decayCoef(C.mech.tick.attackS, sr))
@@ -229,6 +287,12 @@ class FlatSixProcessor extends AudioWorkletProcessor {
   }
   gauss() { return (this.rand() + this.rand() + this.rand() - 1.5) * 2 }
 
+  // Exact phasor from the crank angle (on construction and once per cycle → no drift).
+  resyncPhasor() {
+    const a = 1.5 * this.theta * DEG
+    this.zr = Math.cos(a); this.zi = Math.sin(a)
+  }
+
   // Fourier transform (complex) of the unit pulse shape at angular frequency w:
   //   p(t) = [(1+u)e^(−t/τd) − u·e^(−t/τu)]·(1 − e^(−t/τa))²
   // Each e^(−t/τ) term transforms to F(τ) = τ/(1 + jwτ); the squared attack expands to
@@ -251,16 +315,23 @@ class FlatSixProcessor extends AudioWorkletProcessor {
   }
 
   setRamp(i, v) { this.rampTgt[i] = v }
+  // complex support amplitude a·e^{iφ} with φ = arg(pRe + i·pIm)
+  setRampPhasor(iRe, a) {
+    const m = Math.hypot(this.pRe, this.pIm) || 1
+    this.rampTgt[iRe] = a * this.pRe / m
+    this.rampTgt[iRe + 1] = a * this.pIm / m
+  }
 
   // Per-block control computations (cheap enough at 375 Hz, keeps the sample loop lean).
   updateBlock() {
     const C = this.C, P = C.pulse, sr = this.sr
     const rpm = this.rpmS, load = this.loadS, red = C.redlineRpm
     const rpmN = clamp(rpm / red, 0, 1.2)
+    const rpmN1 = clamp(rpmN, 0, 1)
     const fFire = rpm / 20
     const T = fFire > 1 ? 1 / fFire : 1
 
-    const td = clamp(lerp(P.decayFracLo, P.decayFracHi, clamp(rpmN, 0, 1)) * T, P.decayMinS, P.decayMaxS)
+    const td = clamp(lerp(P.decayFracLo, P.decayFracHi, rpmN1) * T, P.decayMinS, P.decayMaxS)
     const ta = P.attackS
     const tu = td * P.rarefactionTauMul
     const kA = this.kA
@@ -271,29 +342,29 @@ class FlatSixProcessor extends AudioWorkletProcessor {
     // Pulse amplitude: throttle gain with an idle floor (no fuel cut near idle).
     const idleFloor = P.idleLoad * (1 - smoothstep(rpm, P.idleLoadFadeRpm[0], P.idleLoadFadeRpm[1]))
     const effLoad = Math.max(load, idleFloor, P.minLoad)
-    const rpmGain = lerp(P.rpmGainLo, P.rpmGainHi, clamp(rpmN, 0, 1))
+    const rpmGain = lerp(P.rpmGainLo, P.rpmGainHi, rpmN1)
     this.pulseAmp = Math.pow(effLoad, P.loadExponent) * rpmGain
     this.fullAmp = rpmGain
 
-    this.jitDeg = lerp(C.jitter.timingDegLo, C.jitter.timingDegHi, clamp(rpmN, 0, 1))
-    this.jitGain = lerp(C.jitter.gainLo, C.jitter.gainHi, clamp(rpmN, 0, 1))
+    this.jitDeg = lerp(C.jitter.timingDegLo, C.jitter.timingDegHi, rpmN1)
+    this.jitGain = lerp(C.jitter.gainLo, C.jitter.gainHi, rpmN1)
+    this.imbSpread = lerp(C.imbalance.gainLo, C.imbalance.gainHi, rpmN1)
+    this.lumpSigma = lerp(C.lump.sigmaLo, C.lump.sigmaHi, smoothstep(rpm, C.lump.fadeRpm[0], C.lump.fadeRpm[1]))
     this.setRamp(R_TURB, P.turbulence + P.turbulenceOffLoad * (1 - load))
 
-    // Support sines: amplitude = ratio × (pulse train harmonic for a unit-amplitude pulse).
+    // Support sines: amplitude = ratio × (pulse train harmonic for a unit-amplitude pulse),
+    // phase = the pulse train's own harmonic phase (they reinforce, never cancel).
     const w3 = TWO_PI * fFire
+    const Su = C.support
+    const s3 = lerp(Su.order3Lo, Su.order3Hi, rpmN1)
     this.pulseSpectrum(w3, td, ta, tu, this.u)
     const m3 = 2 * Math.hypot(this.pRe, this.pIm) / T
-    this.setRamp(R_PH3, Math.atan2(this.pIm, this.pRe))
+    this.setRampPhasor(R_S3C, s3 * m3)
     this.pulseSpectrum(2 * w3, td, ta, tu, this.u)
     const m6 = 2 * Math.hypot(this.pRe, this.pIm) / T
-    this.setRamp(R_PH6, Math.atan2(this.pIm, this.pRe))
+    this.setRampPhasor(R_S6C, Su.order6 * m6)
     this.pulseSpectrum(0.5 * w3, td, ta, tu, this.u)
-    this.setRamp(R_PH15, Math.atan2(this.pIm, this.pRe))
-    const Su = C.support
-    const s3 = lerp(Su.order3Lo, Su.order3Hi, clamp(rpmN, 0, 1))
-    this.setRamp(R_SUP3, s3 * m3)
-    this.setRamp(R_SUP6, Su.order6 * m6)
-    this.setRamp(R_SUP15, Su.order1_5 * m3 * (1 + s3))
+    this.setRampPhasor(R_S15C, Su.order1_5 * m3 * (1 + s3))
     this.aEnergy = onePoleCoef(Math.max(Su.followerPeriods * T, Su.followerMinS), sr)
 
     // Exhaust tone.
@@ -303,7 +374,10 @@ class FlatSixProcessor extends AudioWorkletProcessor {
     const L = X.lowpass
     const fc = Math.min(L.maxHz, L.baseHz + L.perRpmHz * rpm * (L.loadMin + (1 - L.loadMin) * load))
     this.exLp.set(fc, L.q, sr)
+    this.exLpSide.copy(this.exLp)
     this.setRamp(R_HOLLOW, X.hollow * (1 - load) * smoothstep(rpm, X.hollowRpm[0], X.hollowRpm[1]))
+    // Hot gas = faster sound = shorter pipes: delays ×1/(1 + k·load·rpmN), smoothed (seconds).
+    this.setRamp(R_DSCALE, 1 / (1 + X.gasTemp.amount * load * rpmN))
 
     const R = C.rasp
     this.setRamp(R_RASP, R.level * smoothstep(rpm, R.startRpm, R.fullRpm) *
@@ -311,22 +385,22 @@ class FlatSixProcessor extends AudioWorkletProcessor {
 
     // Intake.
     const I = C.intake
-    let lvl = I.levelBase + I.levelRange * load * Math.pow(clamp(rpmN, 0, 1), I.levelExp)
+    let lvl = I.levelBase + I.levelRange * load * Math.pow(rpmN1, I.levelExp)
     let bump = 1
     for (let i = 0; i < I.flapBumps.length; i++) {
       const b = I.flapBumps[i]
       bump += b.gain * smoothstep(rpm, b.rpm - b.width, b.rpm + b.width)
     }
     this.setRamp(R_INTAKE, lvl * bump * I.gain * smoothstep(rpm, I.presenceRpm[0], I.presenceRpm[1]))
-    this.runner.set(lerp(I.runner.hzLo, I.runner.hzHi, clamp(rpmN, 0, 1)), I.runner.q, sr)
-    this.howl.set(lerp(I.howl.hzLo, I.howl.hzHi, clamp(rpmN, 0, 1)), I.howl.q, sr)
+    this.runner.set(lerp(I.runner.hzLo, I.runner.hzHi, rpmN1), I.runner.q, sr)
+    this.howl.set(lerp(I.howl.hzLo, I.howl.hzHi, rpmN1), I.howl.q, sr)
 
     // Mech.
     const M = C.mech
     const presence = smoothstep(rpm, 0, M.presenceRpm)
-    const mr = Math.pow(clamp(rpmN, 0, 1), M.ampRpmExp)
+    const mr = Math.pow(rpmN1, M.ampRpmExp)
     for (let i = 0; i < this.nOrders; i++) this.setRamp(R_MECH0 + i, lerp(M.ampLo[i], M.ampHi[i], mr) * presence * M.gain)
-    this.tickAmp = lerp(M.tick.levelLo, M.tick.levelHi, clamp(rpmN, 0, 1)) * presence
+    this.tickAmp = lerp(M.tick.levelLo, M.tick.levelHi, rpmN1) * presence
 
     // Overrun pop arming: lift-off after real load.
     const O = C.overrun
@@ -351,14 +425,9 @@ class FlatSixProcessor extends AudioWorkletProcessor {
     // Ramps: from the current values to the new targets over this block.
     for (let i = 0; i < this.nRamps; i++) {
       if (this.firstBlock) this.rampCur[i] = this.rampTgt[i]
-      let d = this.rampTgt[i] - this.rampCur[i]
-      if (i === R_PH3 || i === R_PH6 || i === R_PH15) {
-        // shortest way round for phase offsets
-        while (d > Math.PI) d -= TWO_PI
-        while (d < -Math.PI) d += TWO_PI
-      }
-      this.rampInc[i] = d / 128
+      this.rampInc[i] = (this.rampTgt[i] - this.rampCur[i]) / 128
     }
+    if (this.firstBlock) this.dScale = this.rampTgt[R_DSCALE]
     this.firstBlock = false
   }
 
@@ -368,7 +437,10 @@ class FlatSixProcessor extends AudioWorkletProcessor {
     const slot = this.slotIdx
     const cyl = this.cylOfSlot[slot]
     const bank = this.bankOfCyl[cyl]
-    const cg = this.imbGain[cyl] * (1 + this.jitGain * this.gauss())
+    // slow cycle-to-cycle wander (AR(1) at firing rate): lumpy idle, smooth at speed
+    this.lump = C.lump.rho * this.lump + Math.sqrt(1 - C.lump.rho * C.lump.rho) * this.lumpSigma * this.gauss()
+    const cg = (1 + this.imbUnit[cyl] * this.imbSpread) * this.bankGain[cyl] *
+      (1 + this.jitGain * this.gauss()) * Math.max(0, 1 + this.lump)
 
     // Combustion pulse, unless the ignition is cut.
     let amp = this.pulseAmp * this.combS * cg
@@ -420,7 +492,7 @@ class FlatSixProcessor extends AudioWorkletProcessor {
   process(inputs, outputs, params) {
     const out = outputs[0]
     if (!out || out.length === 0) return true
-    const chE = out[0], chI = out[1], chM = out[2]
+    const chE = out[0], chES = out[1], chI = out[2], chIS = out[3], chM = out[4]
     const N = chE.length
     const C = this.C, sr = this.sr
 
@@ -435,10 +507,12 @@ class FlatSixProcessor extends AudioWorkletProcessor {
     const u = this.u
     const X = C.exhaust, I = C.intake, O = C.overrun, St = C.starter
     const hdrWet = X.headerWet, mainWet = X.mainWet, popNoise = O.noiseMix, blatNoise = C.cut.blatNoise
-    const nOrders = this.nOrders, orders = C.mech.orders
+    const sideTail = X.stereo.tailSide, sideBank = X.stereo.bankSide, inSideLvl = I.side.level
+    const nOrders = this.nOrders, orders = C.mech.orders, mechPow = this.mechPow, mechTrig = this.mechTrig
     const rc = this.rampCur, ri = this.rampInc
-    const nR = this.nRamps
+    const nR = this.nRamps, nPow = this.nPow, powR = this.powR, powI = this.powI
     const eDA = this.envD[0], eDB = this.envD[1], eUA = this.envU[0], eUB = this.envU[1]
+    const aDS = this.aDScale
 
     for (let n = 0; n < N; n++) {
       // 0) advance ramps (block-rate controls → per-sample)
@@ -451,9 +525,17 @@ class FlatSixProcessor extends AudioWorkletProcessor {
       this.combS += this.aComb * (combT - this.combS)
       this.startS += this.aStart * (startT - this.startS)
       const wobble = rc[R_WOBBLE]
-      const rpmEff = this.rpmS * (1 + wobble * Math.sin(3 * this.theta * DEG))
+      // sin(3θ) = Im(z²) — from the phasor, no trig
+      const rpmEff = wobble > 1e-9
+        ? this.rpmS * (1 + wobble * 2 * this.zr * this.zi) : this.rpmS
       const dTh = rpmEff * 6 / sr          // degrees per sample
       this.theta += dTh
+      // rotate the phasor by 1.5·dθ (4th-order Taylor; |a| ≤ 0.035 rad → error < 1e-10/step)
+      const a = 1.5 * dTh * DEG, a2 = a * a
+      const ca = 1 - a2 * 0.5 + a2 * a2 / 24, sa = a * (1 - a2 / 6)
+      const zr = this.zr * ca - this.zi * sa
+      this.zi = this.zr * sa + this.zi * ca
+      this.zr = zr
 
       // 2) decay all envelope states
       eDA.decay(); eDB.decay(); eUA.decay(); eUB.decay()
@@ -471,6 +553,7 @@ class FlatSixProcessor extends AudioWorkletProcessor {
       if (this.theta >= 720) {
         this.theta -= 720; this.nextFire -= 720; this.slotBase -= 720
         if (this.tickAngle < 1e8) this.tickAngle -= 720
+        this.resyncPhasor()
       }
       if (this.popCountdown >= 0 && this.popCountdown-- === 0) {
         this.envPop.set(this.popPendingDecay, this.kPopA)
@@ -481,57 +564,81 @@ class FlatSixProcessor extends AudioWorkletProcessor {
         }
       }
       this.energy += this.aEnergy * (this.energyTarget - this.energy)
+      this.dScale += aDS * (rc[R_DSCALE] - this.dScale)
+
+      // engine-order powers z^m: order 1.5·m → (powR, powI) = (cos, sin)(1.5·m·θ)
+      powR[0] = 1; powI[0] = 0
+      for (let m = 1; m < nPow; m++) {
+        powR[m] = powR[m - 1] * this.zr - powI[m - 1] * this.zi
+        powI[m] = powR[m - 1] * this.zi + powI[m - 1] * this.zr
+      }
 
       // 4) synthesis
-      const white = this.noise()
+      const white = this.noise(), white2 = this.noise()
       this.turbLp += this.turbC * (white - this.turbLp)
+      this.turbLp2 += this.turbC * (white2 - this.turbLp2)
       const nT = this.turbLp * this.turbNorm
-      const th = this.theta * DEG
+      const nT2 = this.turbLp2 * this.turbNorm
       const tm = 1 + rc[R_TURB] * nT
       let pA = ((1 + u) * eDA.value() - u * eUA.value()) * tm
       let pB = ((1 + u) * eDB.value() - u * eUB.value()) * tm
-      // support sines (phase-locked to the crank and to the pulse train's own harmonics)
+      // support sines: Re(A·z^m) with A the ramped complex amplitude
       const E = this.energy
-      const sup = E * (rc[R_SUP3] * Math.cos(3 * th + rc[R_PH3]) + rc[R_SUP6] * Math.cos(6 * th + rc[R_PH6]) +
-        rc[R_SUP15] * Math.cos(1.5 * th + rc[R_PH15]))
+      const sup = E * (powR[2] * rc[R_S3C] - powI[2] * rc[R_S3S] + powR[4] * rc[R_S6C] -
+        powI[4] * rc[R_S6S] + powR[1] * rc[R_S15C] - powI[1] * rc[R_S15S])
       const thump = this.envThump.value()
-      const pump = rc[R_HOLLOW] * nT * (0.5 + 0.5 * Math.cos(3 * th))
+      const hollow = rc[R_HOLLOW]
+      const pump = hollow > 1e-9 ? hollow * nT * (0.5 + 0.5 * powR[2]) : 0
       pA = this.dcPulseA.tick(pA + 0.5 * (sup + thump) + pump)
       pB = this.dcPulseB.tick(pB + 0.5 * (sup + thump) + pump)
 
-      // exhaust pipes
-      const hA = this.hdrA.tick(pA), hB = this.hdrB.tick(pB)
+      // exhaust pipes (header/main delays shortened by hot gas)
+      const ds = this.dScale
+      const hA = this.hdrA.tick(pA, ds), hB = this.hdrB.tick(pB, ds)
       let x = (pA + pB) * (1 - hdrWet) + (hA + hB) * hdrWet
       // afterfire pops / cut blats enter downstream of the headers
       x += this.envPop.value() * (1 - popNoise + popNoise * nT)
       x += this.envBlat.value() * (1 - blatNoise + blatNoise * nT)
-      const m = this.main.tick(x)
+      const m = this.main.tick(x, ds)
       x = x * (1 - mainWet) + m * mainWet
       const muff = 0.5 * (this.muf1.tick(x) + this.muf2.tick(x))
       const flap = rc[R_FLAP]
       x = x * (1 - flap) + muff * flap
-      x = this.tail.tick(x)
+      // twin tailpipes: mid = their mean, side = half their difference (+ bank difference)
+      const tL = this.tailL.tick(x), tR = this.tailR.tick(x)
+      const mid = 0.5 * (tL + tR)
+      const side = sideTail * 0.5 * (tL - tR) + sideBank * (hA - hB)
       // rasp: high-passed, soft-clipped (analytic x/√(1+x²): smooth everywhere, unlike
-      // x/(1+|x|) whose curvature jumps at zero), then a 4-pole lowpass
-      this.raspHpLp += this.raspHpC * (x - this.raspHpLp)
-      const hp = (x - this.raspHpLp) * C.rasp.drive
+      // x/(1+|x|) whose curvature jumps at zero), then a 4-pole lowpass. Centre only.
+      this.raspHpLp += this.raspHpC * (mid - this.raspHpLp)
+      const hp = (mid - this.raspHpLp) * C.rasp.drive
       const rasp = this.raspLp2.tick(this.raspLp.tick(hp / Math.sqrt(1 + hp * hp)))
-      const ex = this.exLp.tick(x) + rc[R_RASP] * rasp
+      const ex = this.exLp.tick(mid) + rc[R_RASP] * rasp
       chE[n] = this.dcEx.tick(ex * X.gain)
+      if (chES) chES[n] = this.dcExS.tick(this.exLpSide.tick(side) * X.gain)
 
-      // intake
+      // intake: tone + low-passed (not raw white) noise through the formants
+      const lvlI = rc[R_INTAKE]
       if (chI) {
-        const src = this.envIntake.value() * (I.tonal + I.noise * white)
+        const env = this.envIntake.value()
+        const src = env * (I.tonal + I.noise * nT2)
         this.inDirect += this.inDirectC * (src - this.inDirect)
         const y = this.plenum.bp(src) * I.plenum.gain + this.runner.bp(src) * I.runner.gain +
           this.howl.bp(src) * I.howl.gain + this.inDirect * I.direct
-        chI[n] = this.dcIn.tick(y * rc[R_INTAKE])
+        chI[n] = this.dcIn.tick(y * lvlI)
+        // side: decorrelated induction air (independent noise stream) — cancels in mono
+        if (chIS) chIS[n] = this.dcInS.tick(this.inSide.bp(env * nT) * inSideLvl * lvlI)
       }
 
-      // mechanical
+      // mechanical (centre)
       if (chM) {
         let mech = 0
-        for (let k = 0; k < nOrders; k++) mech += rc[R_MECH0 + k] * Math.sin(orders[k] * th)
+        if (mechTrig) {
+          const th = this.theta * DEG
+          for (let k = 0; k < nOrders; k++) mech += rc[R_MECH0 + k] * Math.sin(orders[k] * th)
+        } else {
+          for (let k = 0; k < nOrders; k++) mech += rc[R_MECH0 + k] * powI[mechPow[k]]
+        }
         mech += this.tickBp2.bp(this.tickBp.bp(this.envTick.value() * white))
         const whine = rc[R_WHINE]
         if (whine > 1e-6) {
@@ -543,7 +650,7 @@ class FlatSixProcessor extends AudioWorkletProcessor {
         chM[n] = this.dcMe.tick(mech)
       }
     }
-    // land exactly on the targets (no drift); phases kept wrapped
+    // land exactly on the targets (no drift)
     for (let i = 0; i < nR; i++) rc[i] = this.rampTgt[i]
     return true
   }

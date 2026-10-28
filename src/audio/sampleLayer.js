@@ -86,12 +86,19 @@ export async function createSampleLayer(ctx, manifestUrl, config, destination) {
   }
   const single = !manifest.hasOn || !manifest.hasOff
   const target = new Map(voices.map((v) => [v, 0]))
+  // Last values actually scheduled per voice. Only voices that are audible (target > 0) or
+  // that were audible last frame (fading out) get automation; dormant voices are left alone.
+  const sentGain = new Map(voices.map((v) => [v, 0]))
+  const sentRate = new Map(voices.map((v) => [v, NaN]))
+  const zeroAt = new Map(voices.map((v) => [v, -Infinity]))   // when the fade to 0 was scheduled
+  const SETTLED = 5 * S.tauS                                    // after this a faded voice is silent
+  const EPS_GAIN = 1e-4, EPS_RATE = 1e-4
 
   return {
     manifest,
     count: voices.length,
-    /** p = { rpm, load, combustion } (from events.frameToParams). */
-    update(p, when) {
+    /** p = { rpm, load, combustion } (from events.frameToParams). force: re-send everything. */
+    update(p, when, force = false) {
       for (const v of voices) target.set(v, 0)
       const lw = single ? { on: 1, off: 0 } : loadWeights(p.load)
       for (const layer of single ? ['on'] : ['on', 'off']) {
@@ -103,9 +110,25 @@ export async function createSampleLayer(ctx, manifestUrl, config, destination) {
       }
       const life = Math.max(0, Math.min(1, p.combustion))
       for (const v of voices) {
-        v.gain.gain.setTargetAtTime(target.get(v) * v.loop.gain * life, when, S.tauS)
+        const g = target.get(v) * v.loop.gain * life
+        const was = sentGain.get(v)
+        const silent = was === 0 && when - zeroAt.get(v) >= SETTLED
+        if (!force && g === 0 && silent) continue               // dormant: nothing to do
         const rate = Math.max(S.minRate, Math.min(S.maxRate, p.rpm / v.loop.rpm))
-        v.src.playbackRate.setTargetAtTime(rate, when, S.tauS)
+        if (silent && g > 0) {
+          // waking up from silence: snap the rate (inaudible) so it doesn't glide from a stale value
+          v.src.playbackRate.cancelScheduledValues(when)
+          v.src.playbackRate.setValueAtTime(rate, when)
+          sentRate.set(v, rate)
+        } else if (force || !(Math.abs(rate - sentRate.get(v)) < EPS_RATE)) {
+          v.src.playbackRate.setTargetAtTime(rate, when, S.tauS)
+          sentRate.set(v, rate)
+        }
+        if (force || Math.abs(g - was) >= EPS_GAIN || (g === 0 && was !== 0)) {
+          v.gain.gain.setTargetAtTime(g, when, S.tauS)
+          if (g === 0 && was !== 0) zeroAt.set(v, when)
+          sentGain.set(v, g)
+        }
       }
     },
     dispose() {

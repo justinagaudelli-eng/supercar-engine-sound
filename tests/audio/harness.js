@@ -2,9 +2,13 @@
 //
 //   window.renderTimeline({
 //     timeline: [{ t, frame }],   // any vehicle-model frames, pre-scheduled via engine.setFrame
-//     duration, sampleRate = 48000, channels = 1,
-//     preset = 'street', volume = 1, mix = 0, samplesUrl, seed, config (deep-merged overrides)
-//   }) → { sampleRate, renderMs, length, data: base64 Float32 (channel 0), loaded }
+//     duration, sampleRate = 48000, channels = 2,
+//     preset = 'street', volume = 1, mix = 0, samplesUrl, seed, config (deep-merged overrides),
+//     stereo = false             // also return left/right
+//   }) → { sampleRate, renderMs, length, loaded,
+//          data: base64 Float32 MONO SUM (L+R)/2 — what analyses use (mono-compatibility),
+//          channelPeakDb: max |sample| over every channel (the ceiling applies per channel),
+//          left?, right?: base64 Float32 }
 //
 // Other suites (e.g. replay fixtures through the vehicle model) can build any timeline and
 // reuse this page plus tests/audio/analysis.js.
@@ -29,8 +33,8 @@ function toBase64(f32) {
 
 window.renderTimeline = async (opts) => {
   const {
-    timeline, duration, sampleRate = 48000, channels = 1, preset = 'street', volume = 1,
-    mix = 0, samplesUrl = null, seed, config,
+    timeline, duration, sampleRate = 48000, preset = 'street', volume = 1,
+    mix = 0, samplesUrl = null, seed, config, channels = 2, stereo = false,
   } = opts
   const cfg = config ? deepMerge(audioConfig, config) : audioConfig
   const ctx = new OfflineAudioContext(channels, Math.ceil(duration * sampleRate), sampleRate)
@@ -45,7 +49,23 @@ window.renderTimeline = async (opts) => {
   const t0 = performance.now()
   const buf = await ctx.startRendering()
   const renderMs = performance.now() - t0
-  return { sampleRate, renderMs, length: buf.length, data: toBase64(buf.getChannelData(0)), loaded }
+  const chans = []
+  for (let c = 0; c < buf.numberOfChannels; c++) chans.push(buf.getChannelData(c))
+  const sum = new Float32Array(buf.length)
+  let peak = 0
+  for (const ch of chans) {
+    for (let i = 0; i < ch.length; i++) {
+      sum[i] += ch[i] / chans.length
+      const a = Math.abs(ch[i])
+      if (a > peak) peak = a
+    }
+  }
+  const out = {
+    sampleRate, renderMs, length: buf.length, loaded, data: toBase64(sum),
+    channelPeakDb: 20 * Math.log10(Math.max(peak, 1e-12)),
+  }
+  if (stereo && chans.length > 1) { out.left = toBase64(chans[0]); out.right = toBase64(chans[1]) }
+  return out
 }
 
 // Worklet only (no mixer / native nodes): isolates the synth's own CPU cost.
@@ -53,7 +73,7 @@ window.renderWorkletOnly = async ({ duration = 10, sampleRate = 48000, rpmFrom =
   const ctx = new OfflineAudioContext(1, Math.ceil(duration * sampleRate), sampleRate)
   await ctx.audioWorklet.addModule(new URL('../../src/audio/flatSix.worklet.js', import.meta.url))
   const node = new AudioWorkletNode(ctx, 'flat-six', {
-    numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [3],
+    numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [5],
     processorOptions: { config: audioConfig.worklet, seed: audioConfig.seed },
   })
   node.connect(ctx.destination)

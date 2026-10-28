@@ -15,6 +15,12 @@ export const audioConfig = {
   // The worklet smooths again per sample (worklet.smoothing), so these only need to bridge
   // the control rate (~60 Hz frames, maybe jittery on the car).
   params: {
+    // setFrame skips an AudioParam update when the value moved less than this (saves
+    // automation events; cut/combustion/starter are constant most of the time).
+    epsilon: { rpm: 0.5, load: 0.002, cut: 0.001, combustion: 0.001, starter: 0.001, drive: 0.003 },
+    // A gap between frames longer than this (e.g. context suspended/resumed, tab hidden)
+    // cancels pending automation and restarts it from the frame time.
+    gapResetS: 0.5,
     rpmTauS: 0.012,
     loadTauS: 0.03,
     cutTauS: 0.004,
@@ -33,11 +39,15 @@ export const audioConfig = {
     bankBFirstCylinder: 4,
 
     // Fixed per-cylinder imbalance (seeded once per engine) → half orders, "mechanical" feel.
-    imbalance: { timingDeg: 2.5, gain: 0.1 },
+    // Gain spread is rpm-dependent: lumpy idle (±15 %) → tighter at speed (±8 %).
+    imbalance: { timingDeg: 2.5, gainLo: 0.15, gainHi: 0.08 },
     // Bank-to-bank asymmetry (firing alternates banks, so this feeds orders 1.5 / 4.5 / 7.5).
     bankB: { gain: 0.86, timingDeg: 3 },
     // Per-cycle jitter, idle → redline (real engines smooth out as revs rise).
-    jitter: { timingDegLo: 0.7, timingDegHi: 0.15, gainLo: 0.07, gainHi: 0.02 },
+    jitter: { timingDegLo: 0.7, timingDegHi: 0.15, gainLo: 0.1, gainHi: 0.02 },
+    // Slow cycle-to-cycle amplitude wander: AR(1) per firing (rho 0.85 ≈ one engine cycle of
+    // memory), σ 10 % at idle fading to 2 % above ~3.5k. Makes idle lope instead of hum.
+    lump: { rho: 0.85, sigmaLo: 0.1, sigmaHi: 0.02, fadeRpm: [1200, 3500] },
 
     // Combustion (exhaust blow-down) pulse:
     //   v(t) = (e^-t/τd − e^-t/τa) − u·(e^-t/τu − e^-t/τd),  τu = rarefactionTauMul·τd
@@ -66,7 +76,7 @@ export const audioConfig = {
     // cancelling the pulse fundamental. Levels are relative to the pulse train's order-3 /
     // order-6 harmonic, so they track load/cut/limiter automatically via the energy follower.
     support: {
-      order3Lo: 0.9,             // +x of the pulse fundamental at idle (≈ +5.6 dB) …
+      order3Lo: 0.4,             // +x of the pulse fundamental at idle (≈ +2.9 dB; more = idle hum) …
       order3Hi: 0.3,             // … tapering at redline, where pulses already carry the pitch
       order6: 0.35,
       order1_5: 0.16,            // relative to the order-3 harmonic level
@@ -88,7 +98,13 @@ export const audioConfig = {
       flapMixClosed: 0.75,
       flapMixOpen: 0.25,
       flapOpenRpm: [3000, 5500],
+      // Twin centre tailpipes (slightly different) → stereo: mid = mean, side = difference.
       tail: { delayS: 0.0008, feedback: 0.2, lpHz: 8000 },
+      tail2: { delayS: 0.00113, feedback: 0.22, lpHz: 7000 },
+      stereo: { tailSide: 1.0, bankSide: 0.25 },   // side = tailSide·(L−R)/2 + bankSide·(hdrA − hdrB)
+      // Hot exhaust gas → higher speed of sound → header/main resonances move up with load ×
+      // rpm (no static "flanger" on sweeps): delay × 1/(1 + amount·load·rpm/redline), smoothed.
+      gasTemp: { amount: 0.15, tauS: 0.25 },
       // Brightness: fc = baseHz + perRpmHz·rpm·(loadMin + (1−loadMin)·load), clamped.
       lowpass: { baseHz: 700, perRpmHz: 0.55, loadMin: 0.35, maxHz: 7500, q: 0.7 },
       // Off-load pumping "whoosh-burble" (noise modulated at firing rate).
@@ -109,12 +125,13 @@ export const audioConfig = {
       attackS: 0.0008,           // induction is softer than blow-down
       presenceRpm: [150, 600],   // spinning down / cranking: intake puffs fade out
       tonal: 1.0,
-      noise: 0.55,
+      noise: 0.35,               // × low-passed (3 kHz) unit-RMS noise, not raw white
       plenum: { hz: 420, q: 3, gain: 1.0 },
       runner: { hzLo: 1700, hzHi: 2150, q: 2.5, gain: 0.55 },
       howl: { hzLo: 950, hzHi: 1250, q: 2, gain: 0.7 },  // switched-resonance "howl" band (o6/o9 at high rpm)
       direct: 0.25,
       directLpHz: 2500,          // the un-formanted part of the intake stays dark
+      side: { hz: 1200, q: 0.8, level: 0.5 },  // decorrelated induction air → slight width
       levelBase: 0.12,           // level = base + range·load·(rpm/redline)^exp
       levelRange: 0.88,
       levelExp: 1.2,
@@ -201,12 +218,12 @@ export const audioConfig = {
 
   // Sound character presets (mixer only).
   presets: {
-    street: { exhaust: 1.0, intake: 0.85, mech: 0.8, drive: 1.0,
+    street: { exhaust: 1.0, intake: 0.85, mech: 0.8, drive: 1.0, width: 1.0,
       lowShelf: { hz: 120, gainDb: 2 }, highShelf: { hz: 3500, gainDb: 0 }, lowpassHz: 14000, lowpassQ: 0.7, outputGain: 1.0 },
-    track: { exhaust: 1.25, intake: 0.85, mech: 1.0, drive: 1.4,
+    track: { exhaust: 1.25, intake: 0.85, mech: 1.0, drive: 1.4, width: 1.2,
       lowShelf: { hz: 120, gainDb: 1 }, highShelf: { hz: 3500, gainDb: 4 }, lowpassHz: 18000, lowpassQ: 0.7, outputGain: 1.0 },
     // Through the firewall: muffled exhaust, intake (right behind the seats) forward.
-    cabin: { exhaust: 0.75, intake: 1.2, mech: 0.6, drive: 0.9,
+    cabin: { exhaust: 0.75, intake: 1.2, mech: 0.6, drive: 0.9, width: 0.6,
       lowShelf: { hz: 120, gainDb: 4 }, highShelf: { hz: 2500, gainDb: -6 }, lowpassHz: 1900, lowpassQ: 0.6, outputGain: 1.4 },
   },
   defaultPreset: 'street',

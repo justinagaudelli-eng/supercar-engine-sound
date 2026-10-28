@@ -15,6 +15,11 @@ import { loadSettings, updateSettings } from './ui/settings.js'
 
 const MPS_TO_MPH = 2.236936
 const TICK_MS = 1000 / 60
+const SESSION_KEY = 'gt3rs-session-v1'          // engine running → survive a mid-drive reload
+const RESUME_WINDOW_MS = 10 * 60 * 1000
+const REC_CURRENT_KEY = 'gt3rs-rec-current-v1'  // in-progress recording (crash-safe)
+const REC_SAVED_KEY = 'gt3rs-recordings-v1'     // last few finished recordings
+const REC_KEEP = 3
 
 // Bundled replay fixtures (fixtures/*.json), keyed by name.
 const fixtureModules = import.meta.glob('../fixtures/*.json', { eager: true, import: 'default' })
@@ -43,6 +48,15 @@ const state = {
   lastPollMs: 0,
   tickMs: 0,
   errors: [],
+  enginePromise: null,
+  suspendTimer: null,
+  toneOn: false,
+  recordFlushMs: 0,
+  // Audio watchdog: the car can silence us while the context still says 'running'.
+  watchdog: {
+    lastCtxT: null, lastWallMs: null, stalledS: 0,
+    reset() { this.lastCtxT = null; this.lastWallMs = null; this.stalledS = 0 },
+  },
 }
 
 const pipeline = createPipeline()
@@ -60,7 +74,7 @@ const gps = createGpsSource(inputConfig.gps, {
 
 // ---------- UI ----------
 const tach = createTach(document.getElementById('tach'), {
-  redlineRpm: audioConfig.ui?.redlineRpm ?? 8500,
+  redlineRpm: vehicleConfig.engine.redlineRpm,
   maxRpm: 10000,
   units: settings.units,
 })
@@ -69,9 +83,9 @@ const debug = createDebugPanel(document.getElementById('debug'), {
   onToggle: (open) => { settings = updateSettings({ debugOpen: open }) },
 })
 const controls = createControls(document, {
-  onStart: startEngine,
+  onStart: () => startEngine(),
   onStop: stopEngine,
-  onResume: resumeAudio,
+  onResume: () => resumeAudio(),
   onVolume: (v) => { settings = updateSettings({ volume: v }); state.engine?.setVolume(v) },
   onMix: (v) => { settings = updateSettings({ mix: v }); state.engine?.setMix(v) },
   onPreset: (p) => { settings = updateSettings({ preset: p }); state.engine?.setPreset(p) },
@@ -103,32 +117,62 @@ const controls = createControls(document, {
   onRecordToggle: toggleRecording,
   onTestTone: (on) => {
     if (!state.engine) { controls.setTestTone(false); controls.setMessage('Start the engine first (that unlocks audio).', 'info', { timeoutMs: 4000 }); return }
+    state.toneOn = on
     state.engine.testTone(on)
   },
 })
-controls.setFixtures(fixtures.map((f) => ({ name: f.name, description: f.description, durationS: f.durationS })), settings.replayFixture)
+const recovered = recoverInterruptedRecording()
+refreshFixtureList()
 controls.setSettings(settings)
 state.replayTrace = fixtureByName.get(settings.replayFixture) ?? null
 controls.setReplayState(false)
 controls.setEngineState('off')
+if (recovered) controls.setMessage(`Recovered an interrupted recording (${recovered.fixes.length} fixes) — it's under Replay.`, 'info', { timeoutMs: 10000 })
+// Page reloaded mid-drive: one tap brings the engine straight back (no cold start).
+if (recentSession()) {
+  state.engineWanted = true
+  controls.showResumeOverlay(true)
+}
 
 // ---------- audio ----------
-// 'playback' latency: larger buffers, fewer glitches on a weak CPU; we don't need low latency.
-function startEngine() {
+// Session marker: if the page reloads mid-drive (Tesla does this), the next tap resumes the
+// engine straight to idle instead of a cold start.
+function markSession(running) {
+  try {
+    if (running) localStorage.setItem(SESSION_KEY, JSON.stringify({ at: Date.now() }))
+    else localStorage.removeItem(SESSION_KEY)
+  } catch { /* storage unavailable: no reload recovery */ }
+}
+function recentSession() {
+  try {
+    const v = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null')
+    return v && Date.now() - v.at < RESUME_WINDOW_MS
+  } catch { return false }
+}
+
+function createContext() {
+  const Ctx = window.AudioContext || window.webkitAudioContext
+  if (!Ctx) throw new Error('Web Audio is not supported in this browser')
+  // 'playback' latency: larger buffers, fewer glitches on a weak CPU; we don't need low latency.
+  const ctx = new Ctx({ latencyHint: 'playback' })
+  ctx.onstatechange = () => {
+    controls.showResumeOverlay(state.engineWanted && ctx.state !== 'running')
+    if ('mediaSession' in navigator) {
+      try { navigator.mediaSession.playbackState = ctx.state === 'running' ? 'playing' : 'paused' } catch { /* optional */ }
+    }
+  }
+  return ctx
+}
+
+function startEngine({ warm = false } = {}) {
   state.engineWanted = true
   controls.setEngineState('cranking')
-  let ctx
   try {
     // Create + resume synchronously inside the tap so the browser counts it as a gesture.
-    ctx = state.ctx ?? null
-    if (!ctx) {
-      const Ctx = window.AudioContext || window.webkitAudioContext
-      ctx = new Ctx({ latencyHint: 'playback' })
-      state.ctx = ctx
-      ctx.onstatechange = () => controls.showResumeOverlay(state.engineWanted && ctx.state !== 'running')
-    }
-    ctx.resume()
+    state.ctx ??= createContext()
+    state.ctx.resume().catch(() => {})
   } catch (e) {
+    state.engineWanted = false
     fail('Audio could not start', e)
     return
   }
@@ -136,15 +180,28 @@ function startEngine() {
   if (state.source === 'gps') gps.start()
   setupMediaSession()
 
-  const ready = state.engine ? Promise.resolve(state.engine) : buildEngine(ctx)
-  ready.then(() => {
-    pipeline.model.start()
-    controls.showResumeOverlay(ctx.state !== 'running')
-  }).catch((e) => fail('Audio engine failed to load', e))
+  // One shared build promise: repeated taps while the worklet loads never make two engines.
+  state.enginePromise ??= buildEngine(state.ctx).catch((e) => {
+    state.enginePromise = null
+    throw e
+  })
+  state.enginePromise.then(() => {
+    if (!state.engineWanted) return // Stop was tapped while loading
+    if (warm) pipeline.model.forceRunning()
+    else pipeline.model.start()
+    markSession(true)
+    controls.showResumeOverlay(state.ctx.state !== 'running')
+  }).catch((e) => { state.engineWanted = false; fail('Audio engine failed to load', e) })
 }
 
 async function buildEngine(ctx) {
-  const engine = await createEngine(ctx, { ...audioConfig, outputRoute: settings.outputRoute })
+  state.enginesBuilt = (state.enginesBuilt ?? 0) + 1
+  const engine = await createEngine(ctx, { ...audioConfig, outputRoute: settings.outputRoute }, {
+    onRouteFallback: ({ error }) => {
+      controls.setMessage(`Media-element output failed (${error}); using direct Web Audio.`, 'warn', { timeoutMs: 8000 })
+    },
+    onMediaPause: () => { if (state.engineWanted) controls.showResumeOverlay(true) },
+  })
   engine.connect(ctx.destination)
   engine.setPreset(settings.preset)
   engine.setVolume(settings.volume)
@@ -161,12 +218,21 @@ function stopEngine() {
   controls.setEngineState('stopping')
   controls.showResumeOverlay(false)
   releaseWakeLock()
+  markSession(false)
+  if (state.engine && state.toneOn) { state.engine.testTone(false); state.toneOn = false; controls.setTestTone(false) }
+  // After the shutdown sound, suspend audio so the car's media source (and CPU) is released.
+  clearTimeout(state.suspendTimer)
+  state.suspendTimer = setTimeout(() => {
+    if (!state.engineWanted && state.ctx?.state === 'running') state.ctx.suspend().catch(() => {})
+  }, (vehicleConfig.startup.shutdownS + 0.6) * 1000)
 }
 
 function resumeAudio() {
-  if (!state.ctx) return startEngine()
+  if (!state.ctx) return startEngine({ warm: recentSession() })
+  clearTimeout(state.suspendTimer)
   state.ctx.resume().then(() => controls.showResumeOverlay(false)).catch((e) => fail('Could not resume audio', e))
-  if (pipeline.model.state === 'off' && state.engineWanted) pipeline.model.start()
+  if (state.engineWanted && pipeline.model.state === 'off') pipeline.model.start()
+  state.watchdog.reset()
 }
 
 function fail(msg, err) {
@@ -206,19 +272,62 @@ function stopReplay() {
   controls.setReplayState(false)
 }
 
+// Recordings are flushed to localStorage while driving (a mid-drive reload must not lose
+// them) and the last few are kept so they can be replayed in the car or downloaded later.
+
+function savedRecordings() {
+  try { return JSON.parse(localStorage.getItem(REC_SAVED_KEY) || '[]').filter((r) => r && Array.isArray(r.fixes)) } catch { return [] }
+}
+function storeRecording(trace) {
+  let list = [...savedRecordings(), trace]
+  while (list.length) {
+    list = list.slice(-REC_KEEP)
+    try { localStorage.setItem(REC_SAVED_KEY, JSON.stringify(list)); return true } catch { list.shift() }
+  }
+  return false
+}
+function recoverInterruptedRecording() {
+  try {
+    const cur = JSON.parse(localStorage.getItem(REC_CURRENT_KEY) || 'null')
+    localStorage.removeItem(REC_CURRENT_KEY)
+    if (cur && Array.isArray(cur.fixes) && cur.fixes.length > 5) {
+      storeRecording({ ...cur, name: `${cur.name} (recovered)` })
+      return cur
+    }
+  } catch { /* ignore */ }
+  return null
+}
+function flushRecording() {
+  const trace = gps.peekRecording?.()
+  if (!trace) return
+  try { localStorage.setItem(REC_CURRENT_KEY, JSON.stringify(trace)) } catch { /* full: keep in memory */ }
+}
+function refreshFixtureList() {
+  const recorded = savedRecordings()
+  for (const r of recorded) fixtureByName.set(r.name, r)
+  controls.setFixtures([
+    ...recorded.map((r) => ({ name: r.name, description: r.description ?? 'Recorded drive', durationS: (r.fixes.at(-1)?.t ?? 0) / 1000 })),
+    ...fixtures.map((f) => ({ name: f.name, description: f.description, durationS: f.durationS })),
+  ], settings.replayFixture)
+}
+
 function toggleRecording() {
   if (state.recordingSince == null) {
     if (state.source !== 'gps') { controls.setMessage('Recording uses live GPS — switch input to GPS.', 'info', { timeoutMs: 4000 }); return }
     gps.start()
     gps.startRecording()
     state.recordingSince = performance.now()
+    state.recordFlushMs = performance.now()
     controls.setRecording(true, 0)
   } else {
     const trace = gps.stopRecording()
     state.recordingSince = null
     controls.setRecording(false)
+    try { localStorage.removeItem(REC_CURRENT_KEY) } catch { /* ignore */ }
+    const kept = storeRecording(trace)
+    refreshFixtureList()
     downloadJson(trace, `${trace.name}.json`)
-    controls.setMessage(`Saved ${trace.fixes.length} fixes as ${trace.name}.json`, 'info', { timeoutMs: 6000 })
+    controls.setMessage(`Saved ${trace.fixes.length} fixes as ${trace.name}.json${kept ? ' (also kept under Replay)' : ''}`, 'info', { timeoutMs: 8000 })
   }
 }
 
@@ -295,7 +404,11 @@ function tick() {
 
     const uiKey = frame.engineState
     if (uiKey !== lastUiState) { lastUiState = uiKey; controls.setEngineState(frame.engineState) }
-    if (state.recordingSince != null) controls.setRecording(true, (t0 - state.recordingSince) / 1000)
+    if (state.recordingSince != null) {
+      controls.setRecording(true, (t0 - state.recordingSince) / 1000)
+      if (t0 - state.recordFlushMs > 10_000) { state.recordFlushMs = t0; flushRecording() }
+    }
+    if (state.engineWanted) checkAudioWatchdog(t0)
 
     const gpsInfo = {
       source: state.source,
@@ -313,7 +426,28 @@ function tick() {
   state.tickMs = performance.now() - t0
 }
 
+// If audio time stops advancing while we're supposed to be playing (another media source took
+// over, or the browser went to the background), ask for a tap instead of failing silently.
+function checkAudioWatchdog(nowMs) {
+  const w = state.watchdog, ctx = state.ctx
+  if (!ctx || !state.engine) return
+  if (w.lastWallMs == null || nowMs - w.lastWallMs >= 1000) {
+    if (w.lastWallMs != null && document.visibilityState === 'visible') {
+      const wall = (nowMs - w.lastWallMs) / 1000
+      const audio = ctx.currentTime - w.lastCtxT
+      w.stalledS = audio < wall * 0.5 ? w.stalledS + wall : 0
+      if (w.stalledS >= 2) controls.showResumeOverlay(true)
+    }
+    w.lastWallMs = nowMs
+    w.lastCtxT = ctx.currentTime
+  }
+}
+
+let drawSkip = false
 function draw() {
+  // 30 fps is plenty for a tach and halves main-thread work on the car's CPU.
+  drawSkip = !drawSkip
+  if (drawSkip) { requestAnimationFrame(draw); return }
   const f = state.lastFrame, e = state.lastEstimate
   if (f && e) {
     tach.draw({
@@ -350,6 +484,8 @@ window.__gt3rs = {
       source: state.source,
       replayPlaying: state.replay != null,
       errors: [...state.errors],
+      enginesBuilt: state.enginesBuilt ?? 0,
+      overlay: !document.getElementById('resume-overlay')?.hidden,
       levels: state.engine?.levels?.() ?? {},
     }
   },

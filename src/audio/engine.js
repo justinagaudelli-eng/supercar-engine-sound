@@ -1,7 +1,7 @@
 // Audio engine: AudioWorklet flat-six synth + optional sample layer → mixer → limiter.
 // Contract: ARCHITECTURE.md "Audio engine". Works with AudioContext and OfflineAudioContext.
 //
-//   const engine = await createEngine(ctx, audioConfig, { seed?, outputRoute? })
+//   const engine = await createEngine(ctx, audioConfig, { seed?, outputRoute?, onRouteFallback?, onMediaPause? })
 //   engine.connect(ctx.destination)
 //   engine.setFrame(frame, when)          // vehicle-model frame → smoothed AudioParams
 //   engine.setPreset('street'|'track'|'cabin'); engine.setVolume(0..1); engine.setMix(0..1)
@@ -29,7 +29,7 @@ export async function createEngine(ctx, config = defaultConfig, options = {}) {
   const synth = new AudioWorkletNode(ctx, 'flat-six', {
     numberOfInputs: 0,
     numberOfOutputs: 1,
-    outputChannelCount: [3],
+    outputChannelCount: [5],   // exhaust mid/side, intake mid/side, mech
     processorOptions: { config: config.worklet, seed },
   })
   const mixer = createMixer(ctx, config)
@@ -40,6 +40,10 @@ export async function createEngine(ctx, config = defaultConfig, options = {}) {
   const params = Object.fromEntries(PARAMS.map((n) => [n, synth.parameters.get(n)]))
 
   let first = true
+  let lastWhen = -Infinity
+  const sent = { rpm: NaN, load: NaN, cut: NaN, combustion: NaN, starter: NaN }
+  const EPS = P.epsilon
+  const { onRouteFallback, onMediaPause } = options
   let sampleLayer = null
   let tone = null
   let destination = null
@@ -71,19 +75,38 @@ export async function createEngine(ctx, config = defaultConfig, options = {}) {
       try { mixer.output.disconnect() } catch { /* not connected */ }
     },
 
-    /** Schedule a vehicle-model frame at context time `when`. */
+    /**
+     * Schedule a vehicle-model frame at context time `when`.
+     * - First frame: values jump (nothing has sounded yet); afterwards always glide.
+     * - Values that moved less than params.epsilon are not re-sent (fewer automation events).
+     * - A gap > params.gapResetS since the previous frame (context suspended and resumed, tab
+     *   throttled…) cancels anything still pending and restarts the glides from `when`, so
+     *   stale automation can never cause a jump after a resume.
+     */
     setFrame(frame, when = ctx.currentTime) {
       const p = frameToParams(frame)
       lastFrameParams = p
+      if (when < ctx.currentTime) when = ctx.currentTime
+      const gap = !first && when - lastWhen > P.gapResetS
+      if (gap) {
+        for (const n of PARAMS) {
+          const prm = params[n]
+          if (prm.cancelAndHoldAtTime) prm.cancelAndHoldAtTime(when)
+          else prm.cancelScheduledValues(when)
+          sent[n] = NaN
+        }
+      }
       for (const n of PARAMS) {
-        // The first frame jumps (nothing has sounded yet); afterwards always glide.
         if (first) params[n].setValueAtTime(p[n], when)
-        else params[n].setTargetAtTime(p[n], when, tau[n])
+        else if (!(Math.abs(p[n] - sent[n]) < EPS[n])) params[n].setTargetAtTime(p[n], when, tau[n])
+        else continue
+        sent[n] = p[n]
       }
       first = false
-      mixer.setDriveFor(p.rpm, p.load, when)
+      lastWhen = when
+      mixer.setDriveFor(p.rpm, p.load, when, gap)
       events.handle(frame, when)
-      if (sampleLayer) sampleLayer.update(p, when)
+      if (sampleLayer) sampleLayer.update(p, when, gap)
     },
 
     setPreset(name, when = ctx.currentTime) { mixer.setPreset(name, when) },
@@ -135,9 +158,12 @@ export async function createEngine(ctx, config = defaultConfig, options = {}) {
     /**
      * 'direct' → engine.connect() destination. 'mediaElement' → MediaStreamAudioDestination →
      * <audio> element (helps keep audio alive in the background on some browsers). Real
-     * AudioContext only. Must be called from a user gesture the first time (audio.play()).
+     * AudioContext only. Should be called from a user gesture the first time (audio.play()).
+     * If play() rejects, routing falls back to 'direct', resolves 'direct' and calls
+     * options.onRouteFallback({ requested, route, error }). options.onMediaPause() fires when the
+     * media element is paused (e.g. by the browser in the background) while it is the route.
      */
-    async setOutputRoute(next) {
+    async setOutputRoute(next) {  // resolves to the route actually in use
       if (next === 'mediaElement') {
         if (typeof ctx.createMediaStreamDestination !== 'function' || typeof Audio === 'undefined') {
           throw new Error('mediaElement route needs a real AudioContext')
@@ -147,10 +173,20 @@ export async function createEngine(ctx, config = defaultConfig, options = {}) {
           mediaEl = new Audio()
           mediaEl.autoplay = true
           mediaEl.srcObject = mediaDest.stream
+          mediaEl.addEventListener('pause', () => { if (route === 'mediaElement') onMediaPause?.() })
+        }
+        // Only re-route once the element is actually playing; if play() is refused (autoplay
+        // policy, no gesture) stay on — or fall back to — direct output, never go silent.
+        try {
+          await mediaEl.play()
+        } catch (e) {
+          route = 'direct'
+          connectRoute()
+          onRouteFallback?.({ requested: 'mediaElement', route: 'direct', error: e.message })
+          return route
         }
         route = 'mediaElement'
         connectRoute()
-        await mediaEl.play()
       } else {
         route = 'direct'
         connectRoute()
@@ -175,7 +211,10 @@ export async function createEngine(ctx, config = defaultConfig, options = {}) {
 
   // outputRoute may come as an option or inside the config object (main.js does the latter)
   if ((options.outputRoute ?? config.outputRoute) === 'mediaElement') {
-    engine.setOutputRoute('mediaElement').catch((e) => console.warn('[audio] mediaElement route failed:', e.message))
+    engine.setOutputRoute('mediaElement').catch((e) => {
+      console.warn('[audio] mediaElement route failed:', e.message)
+      onRouteFallback?.({ requested: 'mediaElement', route: 'direct', error: e.message })
+    })
   }
   return engine
 }

@@ -108,7 +108,8 @@ describe('input bus on fixtures', () => {
     expect(rep.processor.stats.rejected).toBeGreaterThan(0) // outliers caught
     const errs = out.filter((o) => o.now > 3000).map((o) => Math.abs(o.speedMps - o.truth)).sort((a, b) => a - b)
     const median = errs[Math.floor(errs.length / 2)]
-    expect(median).toBeLessThan(4 * MPH)
+    // Positions-only speed trades ~1 s of lag (3 s window + median-of-3) for stability.
+    expect(median).toBeLessThan(5 * MPH)
     expect(errs.at(-1)).toBeLessThan(15 * MPH)
     expectSmooth(out)
   })
@@ -120,8 +121,9 @@ describe('input bus on fixtures', () => {
     // fixes stop after ~7 s (last at ≤ 8 s); stale after 2.5 s, lost after 6 s
     expect(at(11000).status).toBe('stale')
     expect(Math.abs(at(11000).speedMps - 50 * MPH)).toBeLessThan(2 * MPH)
-    expect(at(17000).status).toBe('lost')
-    expect(at(19500).speedMps).toBeLessThan(at(15000).speedMps)
+    // At 50 mph a dropout is treated as a tunnel: keep holding instead of decaying.
+    expect(at(17000).status).toBe('stale')
+    expect(Math.abs(at(19500).speedMps - 50 * MPH)).toBeLessThan(2 * MPH)
     // Signal back at 20 s: ok again and gliding back to 50 mph without a step.
     expect(at(21500).status).toBe('ok')
     expect(Math.abs(at(26000).speedMps - 50 * MPH)).toBeLessThan(2.5 * MPH)
@@ -199,3 +201,84 @@ describe('live GPS source', () => {
     expect(replayed.map((s) => s.speedMps)).toEqual(samples.map((s) => s.speedMps))
   })
 })
+
+describe('review regressions (Tesla GPS quirks)', () => {
+  const north = (m) => m / 111320
+  const at = (i, meters, speed, acc = 6) => ({ t: i * 1000, lat: 37.4 + north(meters), lon: -122.1, speed, accuracy: acc })
+
+  it('C1: coords.speed stuck at 0 while moving (older Intel cars) → uses positions', () => {
+    const p = createGpsFixProcessor(inputConfig.gps)
+    const out = []
+    for (let i = 0; i < 12; i++) out.push(p.process(at(i, i * 30, 0), i * 1000).sample)
+    expect(p.stats.dopplerBroken).toBe(true)
+    const late = out.slice(-4).map((s) => s.speedMps)
+    for (const v of late) expect(v).toBeGreaterThan(25)
+  })
+
+  it('C1: a real stop (Doppler was moving moments ago) still reads 0', () => {
+    const p = createGpsFixProcessor(inputConfig.gps)
+    let pos = 0
+    const speeds = [20, 15, 10, 5, 1, 0, 0, 0, 0, 0]
+    let last
+    speeds.forEach((v, i) => { pos += v; last = p.process(at(i, pos, v), i * 1000).sample })
+    expect(p.stats.dopplerBroken).toBe(false)
+    expect(last.speedMps).toBe(0)
+  })
+
+  it('M1: GPS clock jumping backwards re-anchors instead of freezing input', () => {
+    const p = createGpsFixProcessor(inputConfig.gps)
+    for (let i = 0; i < 5; i++) p.process(at(i + 100, i * 20, 20), i * 1000)
+    const after = [0, 1, 2].map((i) => p.process(at(i, 200 + i * 20, 20), (5 + i) * 1000))
+    expect(after.every((r) => r.sample && r.sample.speedMps === 20)).toBe(true)
+  })
+
+  it('M2: re-emitted identical positions do not produce 0 / spike speeds', () => {
+    const p = createGpsFixProcessor(inputConfig.gps)
+    const speeds = []
+    // 20 m/s, but the position only updates once per second while fixes arrive at 10 Hz.
+    for (let k = 0; k < 80; k++) {
+      const t = k * 100
+      const r = p.process({ t, lat: 37.4 + north(20 * Math.floor(t / 1000)), lon: -122.1, speed: null, accuracy: 6 }, t)
+      if (r.sample) speeds.push(r.sample.speedMps)
+    }
+    expect(speeds.length).toBeGreaterThan(4)
+    for (const v of speeds.slice(2)) expect(Math.abs(v - 20)).toBeLessThan(4)
+  })
+
+  it('C2: parked with position jitter and no Doppler keeps the engine at idle', async () => {
+    const { createPipeline } = await import('../../src/pipeline.js')
+    const { rng } = await import('../../src/util/math.js')
+    for (const jitter of [1.5, 3, 6]) {
+      const rand = rng(3)
+      const p = createPipeline()
+      p.model.forceRunning()
+      const proc = createGpsFixProcessor(inputConfig.gps)
+      let maxRpm = 0, shifts = 0
+      for (let i = 0; i < 60 * 60; i++) {
+        const now = (i / 60) * 1000
+        if (i % 60 === 0) {
+          const fix = { t: now, lat: 37.4 + north((rand() - 0.5) * 2 * jitter), lon: -122.1 + north((rand() - 0.5) * 2 * jitter), speed: null, accuracy: 8 }
+          const { sample } = proc.process(fix, now)
+          if (sample) p.bus.push(sample)
+        }
+        const { frame } = p.tick(now)
+        if (i > 120) maxRpm = Math.max(maxRpm, frame.rpm)
+        shifts += frame.events.filter((e) => e.type.endsWith('shift')).length
+      }
+      // ±6 m of independent (white) jitter every second is a deliberately extreme case — real
+      // GPS error drifts slowly. There we only require no shifting and no big revs.
+      expect(maxRpm, `jitter ±${jitter} m`).toBeLessThan(jitter < 6 ? 1200 : 2500)
+      expect(shifts, `jitter ±${jitter} m`).toBe(0)
+    }
+  })
+})
+
+describe('dropout at low speed', () => {
+  it('decays toward idle when the signal is lost in slow traffic', () => {
+    const bus = createInputBus(inputConfig)
+    for (let i = 0; i <= 5; i++) bus.push({ speedMps: 8, timestamp: i * 1000, source: 'gps', accuracy: 5, speedSigma: 0.5 })
+    expect(bus.estimate(5000 + 7000).status).toBe('lost')
+    expect(bus.estimate(5000 + 20000).speedMps).toBeLessThan(2)
+  })
+})
+

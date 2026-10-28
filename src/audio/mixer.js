@@ -1,7 +1,9 @@
-// Mixer / master chain (native nodes, cheap in C++):
+// Mixer / master chain (native nodes, cheap in C++). Stereo from the drive stage onwards.
 //
-//   worklet[3ch] → splitter → exhaust/intake/mech gains (preset) ─┐ (analysers per voice)
-//                                                                  ├► voiceBus → synthMix
+//   worklet[5ch: exMid exSide inMid inSide mech] → splitter → per-voice gains (preset; mid+side)
+//     mids + mech → midBus ─┬──────────────► L = mid + w·side ─┐
+//     sides → sideBus ──────┴─(+w / −w)────► R = mid − w·side ─┴► merger(2) → synthMix
+//   (analysers per voice on the mid channels; mono sum (L+R)/2 = mid exactly → mono-safe)
 //   synthMix → preDrive (rpm/load) → WaveShaper(tanh, asym) → postDrive (compensation) → HP (DC)
 //            → body peak → low shelf → high shelf → lowpass (preset tone) → presetOut ─┐
 //   sampleLayer → sampleMix ──────────────────────────────────────────────────────────┤
@@ -54,24 +56,46 @@ export function createMixer(ctx, config) {
   const M = config.mixer
   const D = M.drive
 
-  const splitter = ctx.createChannelSplitter(3)
-  const voice = {}
+  const splitter = ctx.createChannelSplitter(5)
+  const mono = (n) => { n.channelCount = 1; n.channelCountMode = 'explicit'; return n }
+  const voice = {}          // mid (and centre) gain per voice — what the analysers see
+  const voiceSide = {}      // side gain per voice (exhaust, intake)
   const analysers = {}
-  const voiceBus = ctx.createGain()
-  voiceBus.gain.value = M.synthTrim
-  for (const [i, name] of ['exhaust', 'intake', 'mech'].entries()) {
-    const g = ctx.createGain()
-    splitter.connect(g, i)
+  const midBus = mono(ctx.createGain())
+  const sideBus = mono(ctx.createGain())
+  midBus.gain.value = M.synthTrim
+  sideBus.gain.value = M.synthTrim
+  const layout = [['exhaust', 0, 1], ['intake', 2, 3], ['mech', 4, -1]]
+  for (const [name, midCh, sideCh] of layout) {
+    const g = mono(ctx.createGain())
+    splitter.connect(g, midCh)
     const a = ctx.createAnalyser()
     a.fftSize = M.analyserFftSize
     g.connect(a)
-    g.connect(voiceBus)
+    g.connect(midBus)
     voice[name] = g
     analysers[name] = a
+    if (sideCh >= 0) {
+      const s = mono(ctx.createGain())
+      splitter.connect(s, sideCh)
+      s.connect(sideBus)
+      voiceSide[name] = s
+    }
   }
+  const widthL = mono(ctx.createGain())
+  const widthR = mono(ctx.createGain())
+  const busL = mono(ctx.createGain())
+  const busR = mono(ctx.createGain())
+  sideBus.connect(widthL).connect(busL)
+  sideBus.connect(widthR).connect(busR)
+  midBus.connect(busL)
+  midBus.connect(busR)
+  const merger = ctx.createChannelMerger(2)
+  busL.connect(merger, 0, 0)
+  busR.connect(merger, 0, 1)
 
   const synthMix = ctx.createGain()
-  voiceBus.connect(synthMix)
+  merger.connect(synthMix)
 
   const preDrive = ctx.createGain()
   const shaper = ctx.createWaveShaper()
@@ -138,6 +162,10 @@ export function createMixer(ctx, config) {
     at(voice.exhaust.gain, p.exhaust, when, tau)
     at(voice.intake.gain, p.intake, when, tau)
     at(voice.mech.gain, p.mech, when, tau)
+    at(voiceSide.exhaust.gain, p.exhaust, when, tau)
+    at(voiceSide.intake.gain, p.intake, when, tau)
+    at(widthL.gain, p.width, when, tau)
+    at(widthR.gain, -p.width, when, tau)
     lowShelf.frequency.setValueAtTime(p.lowShelf.hz, when)
     highShelf.frequency.setValueAtTime(p.highShelf.hz, when)
     at(lowShelf.gain, p.lowShelf.gainDb, when, tau)
@@ -166,6 +194,9 @@ export function createMixer(ctx, config) {
   // Initial state (set immediately, no glide).
   const t0 = ctx.currentTime
   for (const [name, g] of Object.entries(voice)) g.gain.setValueAtTime(preset[name], t0)
+  for (const [name, g] of Object.entries(voiceSide)) g.gain.setValueAtTime(preset[name], t0)
+  widthL.gain.setValueAtTime(preset.width, t0)
+  widthR.gain.setValueAtTime(-preset.width, t0)
   lowShelf.frequency.value = preset.lowShelf.hz; lowShelf.gain.value = preset.lowShelf.gainDb
   highShelf.frequency.value = preset.highShelf.hz; highShelf.gain.value = preset.highShelf.gainDb
   lowpass.frequency.value = preset.lowpassHz; lowpass.Q.value = preset.lowpassQ
@@ -211,9 +242,16 @@ export function createMixer(ctx, config) {
       samplesActive = active
       applyMix(when, M.mixTauS)
     },
-    setDriveFor(rpm, load, when) {
+    setDriveFor(rpm, load, when, force = false) {
       lastRpmLoad.rpm = rpm; lastRpmLoad.load = load
-      setDrive(driveForFrame(rpm, load, M, preset.drive), when)
+      const d = driveForFrame(rpm, load, M, preset.drive)
+      if (force) {
+        for (const g of [preDrive.gain, postDrive.gain]) {
+          if (g.cancelAndHoldAtTime) g.cancelAndHoldAtTime(when); else g.cancelScheduledValues(when)
+        }
+      }
+      // skip negligible changes (fewer automation events at 60–100 Hz frame rates)
+      if (force || Math.abs(d - lastDrive) >= config.params.epsilon.drive) setDrive(d, when)
     },
     get drive() { return lastDrive },
     levels() {
@@ -226,9 +264,9 @@ export function createMixer(ctx, config) {
       }
     },
     dispose() {
-      for (const n of [splitter, voiceBus, synthMix, preDrive, shaper, postDrive, hp, body, lowShelf,
+      for (const n of [splitter, midBus, sideBus, widthL, widthR, busL, busR, merger, synthMix, preDrive, shaper, postDrive, hp, body, lowShelf,
         highShelf, lowpass, presetOut, sampleIn, sampleMix, fxIn, eventsIn, comp, lim, ceiling, volume, out,
-        ...Object.values(voice), ...Object.values(analysers)]) {
+        ...Object.values(voice), ...Object.values(voiceSide), ...Object.values(analysers)]) {
         try { n.disconnect() } catch { /* already disconnected */ }
       }
     },

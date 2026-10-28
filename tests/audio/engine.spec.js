@@ -69,7 +69,7 @@ function updateMetrics(section, data) {
     dominance: 'tonal peak = local max ≥10 dB above ±60 Hz median, 20 Hz–8 kHz; firing line within 3 dB of strongest',
     clicks: 'residual r = 4th-order Butterworth HP @16 kHz (above the engine model content); flag |r| > 9 × local RMS(r) (±10 ms, ±8 sample guard) and > 1e-4 (production renders: and within 40 dB of the local ±10 ms peak — audibility floor); sensitivity = smallest injected step (dBFS) found 8/8. Production render: 0 flags and must catch a step at its own RMS level. Linear diagnostic render (noise off, rasp/drive/dynamics neutral): 0 flags and must catch ≤ −40 dBFS steps',
     centroid: 'magnitude-weighted spectral centroid 20 Hz–20 kHz',
-    levels: 'rendered at volume 1.0 (maximum, = volume cap); Street preset unless noted',
+    levels: 'rendered at volume 1.0 (maximum, = volume cap); Street preset unless noted. Stereo render; analyses use the mono sum (L+R)/2, peakDb is the per-channel peak',
   }
   m[section] = data
   writeFileSync(METRICS, JSON.stringify(m, null, 2))
@@ -86,10 +86,16 @@ test.afterAll(async () => { await page?.close() })
 
 async function render(opts) {
   const r = await page.evaluate((o) => window.renderTimeline(o), { sampleRate: SR, ...opts })
+  // x = mono sum (L+R)/2: all spectral/click analysis runs on what a mono speaker would get.
+  // The clipping ceiling applies per channel: x.channelPeakDb carries the stereo peak.
   const x = A.decodeFloat32(r.data)
+  x.channelPeakDb = r.channelPeakDb
   expect(A.hasNonFinite(x), 'rendered samples must be finite').toBe(false)
   return { ...r, x }
 }
+
+// Peak used for the ceiling checks: per-channel peak of the stereo render when available.
+const stereoPeakDb = (x, start = 0) => +(x.channelPeakDb ?? A.peakDb(x, start)).toFixed(2)
 
 /** Click scan (+ optional detector sensitivity via injected steps) for a rendered signal. */
 function clickReport(x, startS = 0.05, { calibrate = true, maskDb = PROD_MASK_DB } = {}) {
@@ -111,7 +117,8 @@ function clickReport(x, startS = 0.05, { calibrate = true, maskDb = PROD_MASK_DB
     worstAtS: +det.worstTimeS.toFixed(4),
     detectorSensitivityDb: sensitivityDb,
     maxSampleDelta: +md.value.toFixed(5),
-    peakDb: +A.peakDb(x, start).toFixed(2),
+    peakDb: stereoPeakDb(x, start),
+    monoPeakDb: +A.peakDb(x, start).toFixed(2),
     rmsDb: +A.rmsDb(x, start).toFixed(2),
   }
 }
@@ -154,7 +161,7 @@ function analyseSteady(x, rpm) {
     ordersRelO3Db: orders,
     centroidHz: Math.round(A.spectralCentroid(sp)),
     rmsDb: +A.rmsDb(x, SR).toFixed(2),
-    peakDb: +A.peakDb(x).toFixed(2),
+    peakDb: stereoPeakDb(x),
   }
 }
 
@@ -279,7 +286,7 @@ test('presets: cabin darker than street, track brighter; all under the ceiling',
   for (const preset of ['cabin', 'street', 'track']) {
     const r = await render({ timeline: TL.constant(6000, 1, 2), duration: 2, preset })
     const sp = A.spectrum(r.x, SR, { start: SR / 2, nfft: 32768 })
-    out[preset] = { centroidHz: Math.round(A.spectralCentroid(sp)), rmsDb: +A.rmsDb(r.x, SR / 2).toFixed(2), peakDb: +A.peakDb(r.x).toFixed(2) }
+    out[preset] = { centroidHz: Math.round(A.spectralCentroid(sp)), rmsDb: +A.rmsDb(r.x, SR / 2).toFixed(2), peakDb: stereoPeakDb(r.x) }
     A.writeSpectrogram(r.x, SR, join(REPORTS, `spectrogram-preset-${preset}.png`), { hop: 256 })
   }
   updateMetrics('presets6000Full', out)

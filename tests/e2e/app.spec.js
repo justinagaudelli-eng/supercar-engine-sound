@@ -101,6 +101,34 @@ test.describe('built site', () => {
     expect(errors).toEqual([])
   })
 
+  test('rapid Start/Stop/Start builds exactly one engine; Stop suspends audio', async ({ page }) => {
+    const errors = watchErrors(page)
+    await page.goto(BASE)
+    await page.click('#btn-engine') // start
+    await page.click('#btn-engine') // stop (while the worklet may still be loading)
+    await page.click('#btn-engine') // start again
+    await expect.poll(async () => (await appState(page)).engineState, { timeout: 10_000 }).toBe('running')
+    expect((await appState(page)).enginesBuilt).toBe(1)
+    await page.click('#btn-engine') // stop
+    await expect.poll(async () => (await appState(page)).ctxState, { timeout: 6000 }).toBe('suspended')
+    await startEngine(page) // and it comes back
+    expect((await appState(page)).enginesBuilt).toBe(1)
+    expect(errors).toEqual([])
+  })
+
+  test('reload mid-drive offers one-tap resume straight to idle', async ({ page }) => {
+    await page.goto(BASE)
+    await startEngine(page)
+    await page.reload()
+    await expect(page.locator('#resume-overlay')).toBeVisible()
+    await page.click('#btn-resume')
+    await expect.poll(async () => (await appState(page)).engineState, { timeout: 5000 }).toBe('running')
+    // Warm start: no cranking flare, straight to idle.
+    await page.waitForTimeout(400)
+    expect((await appState(page)).rpm).toBeLessThan(1100)
+    await expect(page.locator('#resume-overlay')).toBeHidden()
+  })
+
   test('settings persist across reloads', async ({ page }) => {
     await page.goto(BASE)
     await page.click('#preset [data-value="track"]')
