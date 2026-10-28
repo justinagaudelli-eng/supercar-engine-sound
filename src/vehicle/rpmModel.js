@@ -5,7 +5,10 @@ import { coupledRpm, bestGear } from './gearbox.js'
 import { clamp, clamp01, lerp, onePole, rng } from '../util/math.js'
 
 export function createRpmModel(cfg, { seed = 1 } = {}) {
-  const E = cfg.engine, GB = cfg.gearbox, S = cfg.shift, L = cfg.launch, ST = cfg.startup
+  const E = cfg.engine, GB = cfg.gearbox, L = cfg.launch, ST = cfg.startup
+  const S_NORMAL = cfg.shift
+  const S_AGGRESSIVE = { ...cfg.shift, ...cfg.shift.aggressive }
+  let S = S_NORMAL           // active shift style (input.aggressive picks it each frame)
   const topGear = GB.ratios.length
   const random = rng(seed)
 
@@ -23,6 +26,9 @@ export function createRpmModel(cfg, { seed = 1 } = {}) {
   let shift = null           // { type, from, toGear, t0, dur, startRpm }
   let limiterPhase = 0
   let limiterActive = false
+  let twoStepPhase = 0
+  let launchArmed = false    // 2-step was holding revs last frame
+  let launchT = null         // when the current launch started (null = not launching)
   let catchT = null          // when the engine caught (for the startup flare)
   let stopFromRpm = 0
   let announced = false      // startup/shutdown event sent for the current state
@@ -137,8 +143,39 @@ export function createRpmModel(cfg, { seed = 1 } = {}) {
   }
 
   function stepRunning(dt, input, frame) {
-    const { speedMps: speed = 0, accelMps2: accel = 0, freeRev = false } = input
+    const { speedMps: speed = 0, accelMps2: accel = 0, freeRev = false, launch = false } = input
     const idle = idleTarget(dt)
+
+    if (launch && speed < L.creepSpeedMps) {
+      // Launch control armed while stopped: 1st gear, clutch open, revs on the 2-step.
+      if (!launchArmed) frame.events.push({ type: 'twoStep' })
+      launchArmed = true
+      gear = 1; gearChosen = true; shift = null
+      frame.launchState = 'armed'
+      frame.twoStep = 1
+      const hold = rpm >= L.twoStepRpm - 1
+      if (!hold) {
+        twoStepPhase = 0
+        rpm = Math.min(L.twoStepRpm, rpm + L.twoStepRiseRpmPerS * dt)
+        return
+      }
+      twoStepPhase = (twoStepPhase + dt * L.twoStepHz) % 1
+      const d = L.twoStepCutDuty
+      const drop = twoStepPhase < d ? twoStepPhase / d : 1 - (twoStepPhase - d) / (1 - d)
+      rpm = L.twoStepRpm - L.twoStepBounceRpm * drop
+      if (twoStepPhase < d) frame.cut = L.twoStepCut
+      return
+    }
+    if (launchArmed) {
+      launchArmed = false
+      twoStepPhase = 0
+      // Moving off from the 2-step = the launch. Released while still stopped = cancelled.
+      if (launch && speed >= L.creepSpeedMps) {
+        launchT = t
+        frame.events.push({ type: 'launch' })
+        frame.launchState = 'launched'
+      }
+    }
 
     if (freeRev && speed < L.creepSpeedMps) {
       // Parked/neutral revving (simulator "rev in neutral" button).
@@ -166,7 +203,10 @@ export function createRpmModel(cfg, { seed = 1 } = {}) {
         // Eased drop from the old-gear rpm to the new-gear rpm; ignition cut at the start.
         const e = p * p * (3 - 2 * p)
         rpm = lerp(shift.startRpm, target, e)
-        if (load >= S.upshiftCutMinLoad && (t - shift.t0) < S.upshiftCutS) frame.cut = 1
+        if (load >= S.upshiftCutMinLoad && (t - shift.t0) < S.upshiftCutS) {
+          frame.cut = 1
+          frame.twoStep = Math.max(frame.twoStep, S.upshiftBang * load)
+        }
       } else {
         // Rev-match blip: overshoot the new-gear rpm slightly, then settle onto it.
         const peak = target + S.blipOvershootRpm
@@ -206,12 +246,14 @@ export function createRpmModel(cfg, { seed = 1 } = {}) {
       state = 'cranking'; stateT = 0; rpm = 0; gearChosen = false; shift = null; announced = false
     },
     stop() {
+      launchArmed = false; launchT = null
       if (state === 'off' || state === 'stopping') return
       state = 'stopping'; stateT = 0; stopFromRpm = rpm; shift = null; announced = false
     },
     reset() {
       state = 'off'; t = 0; stateT = 0; rpm = 0; gear = 1; gearChosen = false; load = 0
       lastShiftT = -Infinity; shift = null; limiterActive = false; catchT = null
+      launchArmed = false; twoStepPhase = 0; launchT = null
       shiftLoad = 0; lastShiftType = null; kickdownUntil = -Infinity
     },
     /** Jump straight to running (tests, page reload while driving). */
@@ -221,12 +263,20 @@ export function createRpmModel(cfg, { seed = 1 } = {}) {
     step(dtIn, input = {}) {
       const dt = clamp(dtIn, 0, 0.25)
       t += dt; stateT += dt
-      const target = clamp01(input.load ?? 0)
+      // Launch control: full throttle while on the 2-step and through the launch itself.
+      S = input.aggressive ? S_AGGRESSIVE : S_NORMAL
+      // The launch ends at the first upshift, after launchBoostMaxS, or if the car isn't
+      // actually accelerating hard (driver lifted).
+      if (launchT != null && (t - launchT > L.launchBoostMaxS || (lastShiftType === 'upshift' && lastShiftT > launchT && !shift) ||
+          (t - launchT > L.launchAbortGraceS && (input.accelMps2 ?? 0) < L.launchAbortAccelMps2))) launchT = null
+      const launching = state === 'running' &&
+        ((input.launch && (input.speedMps ?? 0) < L.creepSpeedMps) || launchT != null)
+      const target = launching ? 1 : clamp01(input.load ?? 0)
       load += (target - load) * onePole(dt, target > load ? cfg.load.attackS : cfg.load.releaseS)
       shiftLoad += (target - shiftLoad) * onePole(dt, cfg.load.shiftTauS)
 
       const frame = {
-        rpm: 0, gear: 0, load, throttle: target, cut: 0, combustion: 0, starter: 0,
+        rpm: 0, gear: 0, load, throttle: target, cut: 0, combustion: 0, starter: 0, twoStep: 0,
         engineState: state, shifting: false, events: [], speedMps: input.speedMps ?? 0,
       }
 

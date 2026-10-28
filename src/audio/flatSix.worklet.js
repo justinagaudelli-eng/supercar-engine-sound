@@ -127,6 +127,7 @@ class FlatSixProcessor extends AudioWorkletProcessor {
       { name: 'cut', defaultValue: 0, minValue: 0, maxValue: 1, automationRate: 'k-rate' },
       { name: 'combustion', defaultValue: 0, minValue: 0, maxValue: 1, automationRate: 'k-rate' },
       { name: 'starter', defaultValue: 0, minValue: 0, maxValue: 1, automationRate: 'k-rate' },
+      { name: 'twoStep', defaultValue: 0, minValue: 0, maxValue: 1, automationRate: 'k-rate' },
     ]
   }
 
@@ -152,6 +153,7 @@ class FlatSixProcessor extends AudioWorkletProcessor {
     this.aStart = onePoleCoef(S.starterTauS, sr)
     this.initialized = false
     this.rpmS = 0; this.loadS = 0; this.cutS = 0; this.combS = 0; this.startS = 0
+    this.twoS = 0                    // launch-control 2-step amount (0..1), block rate
 
     // Firing order → cylinder per 120° slot, bank per cylinder, fixed imbalance per cylinder.
     // Gain imbalance is stored as a unit random per cylinder and scaled by an rpm-dependent
@@ -446,8 +448,17 @@ class FlatSixProcessor extends AudioWorkletProcessor {
     let amp = this.pulseAmp * this.combS * cg
     if (this.cutS > 0.001 && this.rand() < this.cutS) {
       // Skipped firing. Under load it may be a retarded-spark blat instead of silence.
-      if (this.loadS > 0.3 && this.rand() < C.cut.blatProb) {
-        this.envBlat.add(this.fullAmp * C.cut.blatGain * this.loadS * this.combS * cg, frac)
+      // On the 2-step, blats are more frequent and much harder, and unburnt fuel goes bang
+      // in the exhaust.
+      const T = C.twoStep, two = this.twoS
+      if (this.loadS > 0.3 && this.rand() < lerp(C.cut.blatProb, T.blatProb, two)) {
+        this.envBlat.add(this.fullAmp * lerp(C.cut.blatGain, T.blatGain, two) * this.loadS * this.combS * cg, frac)
+      }
+      if (two > 0.01 && this.popCountdown < 0 && this.sinceBurst > T.minBangSpacingS &&
+          this.rand() < T.bangProb * two) {
+        this.schedulePop(lerp(T.delayMinS, T.delayMaxS, this.rand()), T.bangGain * two)
+        this.burstLeft = this.rand() < T.burstProb ? 1 + Math.floor(this.rand() * 2) : 0
+        this.sinceBurst = 0
       }
       amp = 0
     }
@@ -482,10 +493,10 @@ class FlatSixProcessor extends AudioWorkletProcessor {
     this.nextFire = this.slotBase + this.imbDeg[this.cylOfSlot[this.slotIdx]] + this.gauss() * this.jitDeg
   }
 
-  schedulePop(delayS) {  // the pop fires after delayS (countdown in samples)
+  schedulePop(delayS, gainMul = 1) {  // the pop fires after delayS (countdown in samples)
     const O = this.C.overrun
     this.popCountdown = Math.round(delayS * this.sr)
-    this.popPendingAmp = this.fullAmp * lerp(O.gainMin, O.gainMax, this.rand())
+    this.popPendingAmp = this.fullAmp * lerp(O.gainMin, O.gainMax, this.rand()) * gainMul
     this.popPendingDecay = decayCoef(lerp(O.decayMinS, O.decayMaxS, this.rand()), this.sr)
   }
 
@@ -498,6 +509,7 @@ class FlatSixProcessor extends AudioWorkletProcessor {
 
     const rpmT = params.rpm[0], loadT = params.load[0], cutT = params.cut[0]
     const combT = params.combustion[0], startT = params.starter[0]
+    this.twoS = params.twoStep ? params.twoStep[0] : 0
     if (!this.initialized) {
       this.rpmS = rpmT; this.loadS = loadT; this.cutS = cutT; this.combS = combT; this.startS = startT
       this.initialized = true

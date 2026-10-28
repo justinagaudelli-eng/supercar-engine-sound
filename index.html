@@ -24,6 +24,10 @@
       <div id="message" class="message" role="alert" hidden></div>
 
       <button id="btn-engine" class="btn btn-engine" type="button" data-state="off">Start Engine</button>
+      <button id="btn-launch" class="btn btn-launch" type="button" aria-pressed="false" disabled>
+        <span class="launch-title">Launch control · 2-step</span>
+        <span id="launch-hint" class="launch-hint">Start the engine first</span>
+      </button>
 
       <div class="slider-row">
         <label for="volume">Volume</label>
@@ -42,6 +46,14 @@
           <button type="button" data-value="street">Street</button>
           <button type="button" data-value="track">Track</button>
           <button type="button" data-value="cabin">Cabin</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="field-label" id="shift-label">Shifts</span>
+        <div id="shift-style" class="segmented" role="group" aria-labelledby="shift-label">
+          <button type="button" data-value="normal">Normal</button>
+          <button type="button" data-value="aggressive">Aggressive</button>
         </div>
       </div>
 

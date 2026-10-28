@@ -147,6 +147,18 @@ a { color: var(--accent-2); }
 .btn-engine[data-state="cranking"] { background: var(--panel-2); border-color: var(--bad); color: var(--bad); }
 .btn-engine[data-state="stopping"] { opacity: 0.7; }
 
+.btn-launch { flex-direction: column; gap: 2px; min-height: 64px; }
+.btn-launch .launch-title { font-weight: 800; letter-spacing: 0.02em; }
+.btn-launch .launch-hint { font-size: 0.8em; font-weight: 400; color: var(--muted, #9aa0a6); }
+.btn-launch:disabled { opacity: 0.45; }
+.btn-launch[aria-pressed="true"] {
+  background: var(--accent-2); border-color: var(--accent-2); color: #111;
+  animation: launch-pulse 0.27s steps(2, jump-none) infinite;
+}
+.btn-launch[aria-pressed="true"] .launch-hint { color: #111; }
+@keyframes launch-pulse { from { filter: brightness(1); } to { filter: brightness(1.25); } }
+@media (prefers-reduced-motion: reduce) { .btn-launch[aria-pressed="true"] { animation: none; } }
+
 .btn-row { display: flex; flex-wrap: wrap; gap: var(--gap); }
 .btn-row > .btn { flex: 1 1 0; min-width: 120px; }
 

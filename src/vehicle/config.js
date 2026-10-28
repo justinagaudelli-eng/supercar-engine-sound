@@ -52,12 +52,44 @@ export const vehicleConfig = {
     blipLoad: 0.55,             // throttle stab during a downshift blip
     upshiftCutS: 0.07,          // ignition cut length at the start of a loaded upshift
     upshiftCutMinLoad: 0.45,    // only cut ignition on upshifts above this load
+    upshiftBang: 0,             // 0..1: how hard the upshift cut bangs (synth twoStep amount)
+
+    // "Aggressive" shift style (Sport+/track mode): overrides the values above. Holds gears
+    // longer, cuts harder on upshifts (with a bang), downshifts earlier with bigger blips.
+    aggressive: {
+      upshiftLightRpm: 5200,
+      upshiftCurve: 1.0,
+      downshiftLightRpm: 2600,
+      downshiftFullRpm: 5600,
+      brakingDownshiftRpm: 3900,
+      brakingUpshiftFloorRpm: 5600,
+      upshiftCutS: 0.1,
+      upshiftCutMinLoad: 0.2,
+      upshiftBang: 0.75,
+      downshiftTimeS: 0.2,
+      blipOvershootRpm: 650,
+      blipLoad: 0.9,
+      minShiftIntervalS: 0.55,
+    },
   },
 
   launch: {
     creepSpeedMps: 0.4,         // below this we're "stopped"
     clutchSlipRpmLight: 1250,   // slip rpm pulling away gently
     clutchSlipRpmFull: 4800,    // slip rpm on a full-throttle launch
+    // Launch control / "2-step": while stopped and armed, revs are held on a low secondary
+    // limiter with a hard ignition cut (bangs and crackle). The real 992 GT3 RS PDK launch
+    // holds roughly 5,000–6,500 rpm depending on conditions (ESTIMATE, see RESEARCH.md §1).
+    twoStepRpm: 6000,
+    twoStepBounceRpm: 480,      // revs fall this far on each cut
+    twoStepHz: 7.5,             // cut/recover cycles per second (slower and harsher than the main limiter)
+    twoStepCutDuty: 0.45,       // fraction of each cycle with the ignition cut
+    twoStepCut: 0.85,           // cut depth: some cylinders still fire, which gives the crackle
+    twoStepRiseRpmPerS: 11000,
+    launchBoostMaxS: 4,         // after moving off, full load until the first upshift (or this long)
+    launchAbortAccelMps2: 1.2,  // ...unless the car isn't really accelerating (driver lifted)
+    launchAbortGraceS: 0.6,     // GPS lag: give acceleration this long to show up
+    maxArmedS: 20,              // the 2-step disarms itself after this long (e.g. a long red light)
   },
 
   load: {

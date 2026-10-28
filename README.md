@@ -26,7 +26,11 @@ Live URL: **https://justinagaudelli-eng.github.io/gt3rs-engine-sound/**
 3. **While parked**, tap **Start Engine**. That tap also unlocks audio. You'll hear the starter,
    the catch, a flare to ~2,500 rpm and then idle.
 4. Drive. The RPM follows your speed, the gearbox shifts by itself, and lifting off crackles.
-5. If the sound ever stops (e.g. another media source took over), a full-screen **Tap to resume
+5. **Launch control (2-step):** while stopped with the engine running, tap **Launch control**.
+   The revs jump to ~6,000 and bounce off a secondary limiter with bangs and crackle. Then just
+   drive off: the launch plays at full throttle through 1st, and the button disarms itself. Tap it
+   again to cancel. It never needs a tap while moving, and it disarms itself after 20 s.
+6. If the sound ever stops (e.g. another media source took over), a full-screen **Tap to resume
    audio** button appears. Tap it when it's safe.
 
 Your first drive: follow [`TESLA_TEST_CHECKLIST.md`](TESLA_TEST_CHECKLIST.md). Several Tesla
@@ -34,7 +38,9 @@ browser behaviours (background audio, Bluetooth interplay) are undocumented and 
 in the car.
 
 **Controls:** volume · synth/sample mix · sound preset (**Street** balanced, **Track** raw and
-exhaust-forward, **Cabin** muffled through-the-firewall) · input (**GPS / Simulator / Replay**) ·
+exhaust-forward, **Cabin** muffled through-the-firewall) · **Shifts** (**Aggressive**, the default:
+holds gears longer, upshifts with a hard cut and bang, downshifts early with big blips; **Normal**:
+relaxed road shifts) · **Launch control (2-step)** · input (**GPS / Simulator / Replay**) ·
 **Record drive** · **Test tone** · speed units · audio output route. There is also a collapsible
 debug panel showing raw vs filtered speed, load, RPM, gear, audio levels and CPU.
 
@@ -62,6 +68,9 @@ The most likely things to adjust after a first drive:
 - **Shift points:** `vehicle/config.js` → `shift.upshiftLightRpm` (cruise shift point),
   `shift.upshiftFullRpm`.
 - **Pops and crackles:** `audio/config.js` → `overrun.probBase`, `overrun.probPerRpm`.
+- **Launch control:** `vehicle/config.js` → `launch.twoStepRpm`, `twoStepHz`, `twoStepBounceRpm`;
+  bang rate and loudness in `audio/config.js` → `worklet.twoStep`.
+- **Aggressive shifts:** `vehicle/config.js` → `shift.aggressive` (shift points, blip size, upshift bang).
 - **Too buzzy or too dull:** `audio/config.js` → `intake.gain`, `mixer.drive.amount`, and the preset EQs.
 
 Test changes at a desk with **Simulator** (throttle/brake pads plus "Rev in neutral") or **Replay**.

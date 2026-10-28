@@ -18,6 +18,9 @@ moving (step 5) so you can replay the drive at your desk afterwards.
    - Try each **preset** (Street / Track / Cabin) and adjust **Volume** to a comfortable level.
 4. **Optional: "Rev in neutral"** (Simulator input, still parked): hold the button and check it
    revs and bounces off the limiter cleanly. Switch the input back to **GPS** afterwards.
+4b. **Launch control** (engine running, foot on the brake, GPS input): tap **Launch control**. Do you hear
+   the 2-step bang at ~6,000 rpm? Release the brake and pull away *gently* (no need to really
+   launch). Does the button disarm itself, and how long after the car moved (GPS lag)?
 5. **Tap Record drive, then drive slowly in a parking lot** (5–15 mph).
    - Does the RPM follow your speed? Pulling away should rise from idle; braking to a stop should
      fall back to idle. Note any lag (seconds) between the car moving and the sound reacting.

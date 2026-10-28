@@ -1,19 +1,19 @@
 # Verification summary
 
 Final run: 2026-10-27, macOS / Node 26 / headless Chromium (Playwright 1.64).
-**All tests pass: 119 unit + 25 Playwright (audio analysis + end-to-end) = 144.**
+**All tests pass: 127 unit + 29 Playwright (audio analysis + end-to-end) = 156.**
 The Playwright suite was run three times in a row with no flakes.
 
 Re-run: `npm test && npm run build && npx playwright test`.
 
 | Suite | Tests | Result |
 |---|---|---|
-| Unit (Vitest) `tests/unit` | 119 | ✅ all pass |
-| Offline audio, engine (`tests/audio/engine.spec.js`) | 10 | ✅ all pass |
+| Unit (Vitest) `tests/unit` | 127 | ✅ all pass |
+| Offline audio, engine (`tests/audio/engine.spec.js`) | 12 | ✅ all pass |
 | Offline audio, every replay fixture through the real pipeline (`tests/audio/replay-fixtures.spec.js`) | 7 | ✅ all pass |
-| End-to-end on the production build (`tests/e2e/app.spec.js`) | 8 | ✅ all pass |
+| End-to-end on the production build (`tests/e2e/app.spec.js`) | 10 | ✅ all pass |
 
-## 1. Unit tests (119)
+## 1. Unit tests (127)
 
 - **Gearbox:** researched ratios and final drive; speed at 9,000 rpm per gear matches RESEARCH.md; speed↔rpm round trip.
 - **Shift logic:**
@@ -34,6 +34,12 @@ Re-run: `npm test && npm run build && npx playwright test`.
   - Re-emitted identical positions are ignored.
   - Parked position jitter (±1.5 / ±3 / ±6 m) causes no shifts and no revving. ±6 m white jitter is held under 2,500 rpm; smaller jitter keeps idle under 1,200 rpm.
 - **Every fixture through replay → filter → rpm model,** both with Doppler and positions-only: rpm stays between idle and the limiter, no steps outside shifts, no gear hunting, and rpm agrees with speed × gear.
+- **Launch control (2-step):**
+  - Holds 5,520–6,000 rpm in 1st with the cut at the configured duty and full load.
+  - Cancelling while stopped returns to idle.
+  - Driving off launches at full load until the first upshift, with no drop to idle.
+  - Ignored while moving.
+- **Aggressive shift style:** no hunting at seven speeds × three loads; part-throttle upshifts more than 1,000 rpm later than Normal; upshift cut with bang; bigger blips; still brakes down to 1st.
 - **Other:** manifest parsing, equal-power crossfade weights, slicer loop-point math, pitch tracking (< 3 % rpm error), WAV/ZIP encoding, settings with broken storage.
 
 ## 2. Offline audio analysis
@@ -55,7 +61,8 @@ Rendered with `OfflineAudioContext` at 48 kHz through the full graph: worklet, m
 - **No clipping:** ✅ every render peaks between −3.5 and −5.4 dBFS (the ceiling is −1 dBFS).
 - **Brightness rises with rpm:** ✅ centroid 789 → 3,396 Hz at full load and 1,056 → 3,146 Hz at light load, both monotonic.
 - **On-load vs off-load level is audible:** ✅ full vs off is 13.3–14.3 dB from 2,000 rpm up (7.6 dB at idle); full vs light is 6.0–8.4 dB.
-- **No discontinuities:** ✅ zero clicks in the rpm sweep, upshifts, downshift blips, limiter, overrun pops, start/stop, and sample-layer loop points and crossfades.
+- **No discontinuities:** ✅ zero clicks in the rpm sweep, upshifts, downshift blips, limiter, overrun pops, start/stop, launch control (2-step plus launch) and aggressive shifts (rendered from the real vehicle model), and sample-layer loop points and crossfades.
+- **2-step bangs:** 10 detected bangs over 1.9 s on the 2-step, vs 5 on the plain 9,000 rpm limiter; peak −3.2 dBFS.
   - The detector flags spikes above 16 kHz that exceed 9× the local level.
   - Its sensitivity is proven on every render by injecting synthetic steps; it catches steps of −24 to −36 dBFS in the as-heard render.
   - Every scenario is also rendered "linear" (noise off, nonlinear stages neutral). That render has zero clicks, and the detector catches steps as small as −60 dBFS in it.
@@ -89,7 +96,7 @@ Listenable renders are in `reports/audio/*.wav`.
 
 ## 3. End-to-end (production build in Chromium)
 
-All 8 pass:
+All 10 pass:
 - No console errors on load.
 - No AudioContext exists before the tap; Start via a real click → running → idle; Stop → off.
 - The simulator pulls through the gears.
@@ -97,6 +104,8 @@ All 8 pass:
 - Rapid Start/Stop/Start builds exactly one engine, and Stop suspends the audio.
 - A reload mid-drive shows "Tap to resume", which goes straight to idle without a cold start.
 - Settings persist across reloads.
+- Launch control: disabled until the engine runs; the 2-step holds 5,300–6,000 rpm with cuts; flooring the simulator launches and the button disarms itself.
+- The shift style setting defaults to Aggressive and persists.
 - The slicer page loads.
 
 Screenshots of the built app: `reports/screenshots/`.

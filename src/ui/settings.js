@@ -7,6 +7,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
   volume: 0.7,
   mix: 0,                  // 0 = synth only, 1 = samples only
   preset: 'street',
+  shiftStyle: 'aggressive', // 'normal' = comfortable road shifts; 'aggressive' = Sport+/track
   source: 'gps',
   units: 'mph',
   outputRoute: 'direct',
@@ -17,6 +18,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
 
 const ENUMS = {
   preset: ['street', 'track', 'cabin'],
+  shiftStyle: ['normal', 'aggressive'],
   source: ['gps', 'sim', 'replay'],
   units: ['mph', 'kmh'],
   outputRoute: ['direct', 'mediaElement'],

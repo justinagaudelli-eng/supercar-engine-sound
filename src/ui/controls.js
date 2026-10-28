@@ -11,9 +11,10 @@ export function createControls(rootEl = document, handlers = {}) {
 
   const el = {
     engine: $('btn-engine'),
+    launch: $('btn-launch'), launchHint: $('launch-hint'),
     volume: $('volume'), volumeOut: $('volume-value'),
     mix: $('mix'), mixOut: $('mix-value'),
-    preset: $('preset'), source: $('source'), units: $('units'), route: $('output-route'),
+    preset: $('preset'), shiftStyle: $('shift-style'), source: $('source'), units: $('units'), route: $('output-route'),
     simPanel: $('sim-panel'), replayPanel: $('replay-panel'),
     throttle: $('sim-throttle'), brake: $('sim-brake'), freeRev: $('btn-free-rev'),
     releaseToZero: $('release-to-zero'),
@@ -37,12 +38,16 @@ export function createControls(rootEl = document, handlers = {}) {
     else call('onStop')
   })
 
+  // ---- launch control (tap to arm while stopped; driving off launches) ----
+  el.launch?.addEventListener('click', () => call('onLaunch', el.launch.getAttribute('aria-pressed') !== 'true'))
+
   // ---- sliders ----
   bindRange(el.volume, el.volumeOut, (v) => call('onVolume', v))
   bindRange(el.mix, el.mixOut, (v) => call('onMix', v))
 
   // ---- segmented groups ----
   const preset = bindSegmented(el.preset, (v) => call('onPreset', v))
+  const shiftStyle = bindSegmented(el.shiftStyle, (v) => call('onShiftStyle', v))
   const source = bindSegmented(el.source, (v) => { showSourcePanels(v); call('onSource', v) })
   const units = bindSegmented(el.units, (v) => call('onUnits', v))
   const route = bindSegmented(el.route, (v) => call('onOutputRoute', v))
@@ -125,6 +130,21 @@ export function createControls(rootEl = document, handlers = {}) {
       }[engineState] ?? 'Start Engine'
     },
 
+    /** Launch button: 'unavailable' (engine off) | 'ready' | 'armed' | 'moving'. */
+    setLaunch(mode) {
+      if (!el.launch) return
+      el.launch.disabled = mode === 'unavailable' || mode === 'moving'
+      el.launch.setAttribute('aria-pressed', String(mode === 'armed'))
+      if (el.launchHint) {
+        el.launchHint.textContent = {
+          unavailable: 'Start the engine first',
+          ready: 'Tap while stopped, then drive off to launch',
+          armed: 'Armed: drive off to launch, or tap to cancel',
+          moving: 'Only available when stopped',
+        }[mode] ?? ''
+      }
+    },
+
     setSource(name) {
       source.select(name)
       showSourcePanels(name)
@@ -172,6 +192,7 @@ export function createControls(rootEl = document, handlers = {}) {
       if (s.volume != null) setRange(el.volume, el.volumeOut, s.volume)
       if (s.mix != null) setRange(el.mix, el.mixOut, s.mix)
       if (s.preset) preset.select(s.preset)
+      if (s.shiftStyle) shiftStyle.select(s.shiftStyle)
       if (s.source) api.setSource(s.source)
       if (s.units) units.select(s.units)
       if (s.outputRoute) route.select(s.outputRoute)

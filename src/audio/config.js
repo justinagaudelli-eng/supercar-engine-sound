@@ -17,7 +17,7 @@ export const audioConfig = {
   params: {
     // setFrame skips an AudioParam update when the value moved less than this (saves
     // automation events; cut/combustion/starter are constant most of the time).
-    epsilon: { rpm: 0.5, load: 0.002, cut: 0.001, combustion: 0.001, starter: 0.001, drive: 0.003 },
+    epsilon: { rpm: 0.5, load: 0.002, cut: 0.001, combustion: 0.001, starter: 0.001, twoStep: 0.01, drive: 0.003 },
     // A gap between frames longer than this (e.g. context suspended/resumed, tab hidden)
     // cancels pending automation and restarts it from the frame time.
     gapResetS: 0.5,
@@ -26,6 +26,7 @@ export const audioConfig = {
     cutTauS: 0.004,
     combustionTauS: 0.015,
     starterTauS: 0.02,
+    twoStepTauS: 0.008,          // short: upshift bangs only last ~0.1 s
   },
 
   worklet: {
@@ -176,6 +177,19 @@ export const audioConfig = {
     // Ignition cut (upshift, limiter): cut is the probability a firing is skipped. A skipped
     // firing under load may become a retarded-spark "blat".
     cut: { blatProb: 0.35, blatGain: 0.45, blatAttackS: 0.0008, blatDecayS: 0.004, blatNoise: 0.5 },
+
+    // Launch control 2-step (twoStep param = 1): cut firings become hard blats and some
+    // unburnt charges bang in the exhaust (via the pop voice).
+    twoStep: {
+      blatProb: 0.8,             // vs cut.blatProb normally
+      blatGain: 0.9,             // vs cut.blatGain normally
+      bangProb: 0.4,             // per cut firing: chance of an exhaust bang
+      bangGain: 1.25,            // × an overrun pop
+      burstProb: 0.35,           // bang followed by 1–2 crackles
+      delayMinS: 0.004,
+      delayMaxS: 0.03,
+      minBangSpacingS: 0.05,
+    },
 
     // Starter motor while cranking (combustion ≈ 0).
     starter: {

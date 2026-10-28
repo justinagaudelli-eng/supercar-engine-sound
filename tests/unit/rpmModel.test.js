@@ -196,3 +196,109 @@ describe('launch', () => {
     expect(a).toEqual(b)
   })
 })
+
+describe('launch control (2-step)', () => {
+  const L = cfg.launch
+
+  it('holds revs on the 2-step with a cut bounce while stopped and armed', () => {
+    const frames = drive(running(), 3, () => ({ speedMps: 0, accelMps2: 0, load: 0, launch: true }))
+    expect(events(frames, 'twoStep')).toHaveLength(1)
+    const held = frames.slice(120) // after the rise
+    for (const f of held) {
+      expect(f.rpm).toBeLessThanOrEqual(L.twoStepRpm)
+      expect(f.rpm).toBeGreaterThanOrEqual(L.twoStepRpm - L.twoStepBounceRpm - 1)
+      expect(f.gear).toBe(1)
+      expect(f.twoStep).toBe(1)
+      expect(f.launchState).toBe('armed')
+    }
+    expect(held.filter((f) => f.cut > 0).length / held.length).toBeCloseTo(L.twoStepCutDuty, 1)
+    expect(held.at(-1).load).toBeGreaterThan(0.95) // full throttle sound
+  })
+
+  it('cancelling while stopped drops back to idle with no launch', () => {
+    const m = running()
+    drive(m, 1.5, () => ({ speedMps: 0, load: 0, launch: true }))
+    const after = drive(m, 3, () => ({ speedMps: 0, load: 0, launch: false }))
+    expect(events(after, 'launch')).toHaveLength(0)
+    expect(after.at(-1).rpm).toBeLessThan(1100)
+    expect(after.at(-1).twoStep).toBe(0)
+  })
+
+  it('driving off from the 2-step launches at full load, then shifts normally', () => {
+    const m = running()
+    drive(m, 1.5, () => ({ speedMps: 0, load: 0, launch: true }))
+    // Pull away at 6 m/s² with no load from the input: the launch supplies full load.
+    const run = drive(m, 4, (t) => ({ speedMps: 6 * t, accelMps2: 6, load: 0.3, launch: true }))
+    const launches = events(run, 'launch')
+    expect(launches).toHaveLength(1)
+    expect(run.filter((f) => f.launchState === 'launched')).toHaveLength(1)
+    // Clutch slip keeps revs high off the line, no drop to idle.
+    expect(Math.min(...run.slice(0, 60).map((f) => f.rpm))).toBeGreaterThan(4000)
+    // Full-load upshift near the shift light while the boost lasts.
+    const up = events(run, 'upshift')[0]
+    expect(up).toBeDefined()
+    expect(up.load).toBeGreaterThan(0.9)
+    // Armed flag held by the caller doesn't re-arm while moving.
+    expect(run.filter((f) => f.t > 0.2 && f.twoStep > 0)).toHaveLength(0)
+  })
+
+  it('ignores launch requests while moving', () => {
+    const frames = drive(running(), 2, () => ({ speedMps: 15, accelMps2: 0, load: 0.2, launch: true }))
+    expect(frames.every((f) => !f.twoStep && f.launchState == null)).toBe(true)
+    expect(events(frames, 'twoStep')).toHaveLength(0)
+  })
+})
+
+describe('aggressive shift style', () => {
+  const A = { ...cfg.shift, ...cfg.shift.aggressive }
+
+  it('never hunts between gears at steady speed', () => {
+    for (const mph of [15, 25, 35, 45, 55, 65, 75]) {
+      for (const load of [0.15, 0.3, 0.5]) {
+        const m = running()
+        const v = mph * 0.44704
+        const frames = drive(m, 20, (t) => ({ speedMps: v + 0.4 * Math.sin(t), accelMps2: 0.4 * Math.cos(t), load, aggressive: true }))
+        const shifts = [...events(frames, 'upshift'), ...events(frames, 'downshift')].filter((e) => e.t > 2)
+        expect(shifts.length, `${mph} mph load ${load}`).toBeLessThanOrEqual(1)
+      }
+    }
+  })
+
+  it('holds gears longer than normal at part throttle', () => {
+    const pull = (aggressive) => {
+      const m = running()
+      const frames = drive(m, 12, (t) => ({ speedMps: 2.0 * t, accelMps2: 2.0, load: 0.4, aggressive }))
+      return events(frames, 'upshift').map((e) => frames[Math.round(e.t / DT) - 1].rpm)
+    }
+    const normal = pull(false), aggr = pull(true)
+    const avg = (a) => a.reduce((x, y) => x + y, 0) / a.length
+    expect(avg(aggr)).toBeGreaterThan(avg(normal) + 1000)
+    expect(Math.min(...aggr)).toBeGreaterThan(A.upshiftLightRpm - 100)
+  })
+
+  it('upshifts cut and bang; downshifts blip harder', () => {
+    const m = running()
+    const up = drive(m, 11, (t) => ({ speedMps: 4 * t, accelMps2: 4, load: 1, aggressive: true }))
+    expect(events(up, 'upshift').length).toBeGreaterThan(1)
+    expect(up.some((f) => f.cut === 1 && f.twoStep > 0.5)).toBe(true)
+
+    const peakBlip = (aggressive) => {
+      const mm = running()
+      drive(mm, 4, () => ({ speedMps: 30, accelMps2: 0, load: 0.3, aggressive }))
+      const fr = drive(mm, 5, (t) => ({ speedMps: Math.max(0, 30 - 5 * t), accelMps2: -5, load: 0, aggressive }))
+      const d = events(fr, 'downshift')[0]
+      const i = Math.round(d.t / DT)
+      const target = coupledRpm(fr[i].speedMps, d.to, cfg.gearbox)
+      return Math.max(...fr.slice(i, i + 30).map((f) => f.rpm)) - target
+    }
+    expect(peakBlip(true)).toBeGreaterThan(peakBlip(false) + 200)
+  })
+
+  it('still brakes down through the gears to 1st', () => {
+    const m = running()
+    drive(m, 4, () => ({ speedMps: 30, accelMps2: 0, load: 0.3, aggressive: true }))
+    const fr = drive(m, 8, (t) => ({ speedMps: Math.max(0, 30 - 5 * t), accelMps2: -5, load: 0, aggressive: true }))
+    expect(fr.at(-1).gear).toBe(1)
+    expect(fr.at(-1).rpm).toBeLessThan(1100)
+  })
+})

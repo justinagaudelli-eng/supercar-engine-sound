@@ -79,4 +79,13 @@ Judgment calls made while building autonomously. Each: what was chosen, why, and
 35. **Stereo synth.** Exhaust banks are panned L/R and the intake is slightly wide. All analysis runs on the mono sum, so the mix stays mono-compatible.
 36. **The audio agent's run ended early (API rate limit)** after it had implemented all eight requested audio fixes. I verified the work by re-running the full audio suite, which passed. Its last in-progress extra tests (gap/resume, mediaElement fallback) were not added; the e2e lifecycle tests cover resume.
 37. **Publishing to GitHub was blocked by this session's permission policy** (creating a public repo is treated as an outward-facing action). Everything is committed locally; the README and the final message give the exact commands.
-
+38. **Launch control (2-step), added on request.**
+    - It's a tap-to-arm toggle, not a hold button, so the driver never has to touch the screen while moving. It only arms while stopped.
+    - When the car moves off it becomes the launch itself: full load until the first upshift, ending early if the car isn't really accelerating. It disarms itself after 20 s armed.
+    - The 2-step holds 6,000 rpm (the real 992 PDK launch holds roughly 5,000–6,500, an ESTIMATE). It bounces 480 rpm at 7.5 Hz with an 85 %-deep cut, so some cylinders still fire and crackle.
+    - Sound: a new worklet param `twoStep` makes cut firings hard blats and adds exhaust bangs through the existing pop voice.
+    - Strictly, a factory GT3 RS launch is a smooth hold; the aftermarket-style "2-step" crackle was what was asked for.
+39. **Aggressive shift style, added on request, and the default.**
+    - It holds gears longer (part-throttle upshifts from 5,200 rpm) and downshifts earlier (2,600–5,600, braking 3,900).
+    - Upshifts use a 100 ms cut with a bang, applied above 20 % load. Downshift blips are bigger (650 rpm overshoot).
+    - "Normal" keeps the original road map. The same anti-hunt rules apply, and tests show no hunting at seven speeds × three loads in either style.

@@ -18,7 +18,7 @@ import { createSampleLayer } from './sampleLayer.js'
 const WORKLET_URL = new URL('./flatSix.worklet.js', import.meta.url)
 const loadedContexts = new WeakSet()
 
-const PARAMS = ['rpm', 'load', 'cut', 'combustion', 'starter']
+const PARAMS = ['rpm', 'load', 'cut', 'combustion', 'starter', 'twoStep']
 
 export async function createEngine(ctx, config = defaultConfig, options = {}) {
   if (!loadedContexts.has(ctx)) {
@@ -36,12 +36,12 @@ export async function createEngine(ctx, config = defaultConfig, options = {}) {
   synth.connect(mixer.input)
   const events = createEvents(ctx, { ...config, seed }, mixer.eventsInput)
   const P = config.params
-  const tau = { rpm: P.rpmTauS, load: P.loadTauS, cut: P.cutTauS, combustion: P.combustionTauS, starter: P.starterTauS }
+  const tau = { rpm: P.rpmTauS, load: P.loadTauS, cut: P.cutTauS, combustion: P.combustionTauS, starter: P.starterTauS, twoStep: P.twoStepTauS }
   const params = Object.fromEntries(PARAMS.map((n) => [n, synth.parameters.get(n)]))
 
   let first = true
   let lastWhen = -Infinity
-  const sent = { rpm: NaN, load: NaN, cut: NaN, combustion: NaN, starter: NaN }
+  const sent = { rpm: NaN, load: NaN, cut: NaN, combustion: NaN, starter: NaN, twoStep: NaN }
   const EPS = P.epsilon
   const { onRouteFallback, onMediaPause } = options
   let sampleLayer = null

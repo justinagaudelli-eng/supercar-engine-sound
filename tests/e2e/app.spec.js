@@ -139,6 +139,48 @@ test.describe('built site', () => {
     await expect(page.locator('#volume')).toHaveValue('40')
   })
 
+  test('launch control: 2-step while stopped, launches on drive-off, then disarms', async ({ page }) => {
+    const errors = watchErrors(page)
+    await page.goto(BASE)
+    await expect(page.locator('#btn-launch')).toBeDisabled() // engine off
+    await page.click('#source [data-value="sim"]')
+    await startEngine(page)
+    await page.click('#btn-launch')
+    await expect(page.locator('#btn-launch')).toHaveAttribute('aria-pressed', 'true')
+    await expect.poll(async () => (await appState(page)).rpm, { timeout: 5000 }).toBeGreaterThan(5300)
+    // Bouncing on the 2-step: rpm stays in the band and the ignition cuts.
+    let cuts = 0
+    for (let i = 0; i < 25; i++) {
+      const s = await appState(page)
+      expect(s.rpm).toBeGreaterThan(5300)
+      expect(s.rpm).toBeLessThanOrEqual(6000)
+      if (s.cut > 0) cuts++
+      await page.waitForTimeout(37)
+    }
+    expect(cuts).toBeGreaterThan(3)
+    // Floor it: the car moves off, launch control disarms itself (no tap needed while moving).
+    await page.evaluate(() => {
+      const el = document.getElementById('sim-throttle')
+      document.getElementById('release-to-zero').checked = false
+      document.getElementById('release-to-zero').dispatchEvent(new Event('change'))
+      el.focus()
+      el.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }))
+    })
+    await expect.poll(async () => (await appState(page)).launch, { timeout: 5000 }).toBe(false)
+    await expect(page.locator('#btn-launch')).toHaveAttribute('aria-pressed', 'false')
+    await expect(page.locator('#btn-launch')).toBeDisabled() // moving
+    await expect.poll(async () => (await appState(page)).gear, { timeout: 15_000 }).toBeGreaterThanOrEqual(2)
+    expect(errors).toEqual([])
+  })
+
+  test('shift style setting persists', async ({ page }) => {
+    await page.goto(BASE)
+    await expect(page.locator('#shift-style [data-value="aggressive"]')).toHaveAttribute('aria-pressed', 'true')
+    await page.click('#shift-style [data-value="normal"]')
+    await page.reload()
+    await expect(page.locator('#shift-style [data-value="normal"]')).toHaveAttribute('aria-pressed', 'true')
+  })
+
   test('slicer tool page loads', async ({ page }) => {
     const errors = watchErrors(page)
     await page.goto(`${BASE}tools/slicer.html`)

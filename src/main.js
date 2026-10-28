@@ -38,6 +38,9 @@ const state = {
   engineWanted: false,      // user tapped Start (and not Stop)
   source: settings.source,
   freeRev: false,
+  launch: false,            // launch control (2-step) armed
+  launchArmedAt: 0,
+  launchUi: '',
   replay: null,
   replayTrace: null,
   recordingSince: null,
@@ -89,6 +92,7 @@ const controls = createControls(document, {
   onVolume: (v) => { settings = updateSettings({ volume: v }); state.engine?.setVolume(v) },
   onMix: (v) => { settings = updateSettings({ mix: v }); state.engine?.setMix(v) },
   onPreset: (p) => { settings = updateSettings({ preset: p }); state.engine?.setPreset(p) },
+  onShiftStyle: (v) => { settings = updateSettings({ shiftStyle: v }) },
   onSource: (s) => setSource(s),
   onUnits: (u) => { settings = updateSettings({ units: u }); tach.setUnits(u) },
   onOutputRoute: (r) => {
@@ -99,6 +103,7 @@ const controls = createControls(document, {
   onThrottle: (v) => simulator.setThrottle(v),
   onBrake: (v) => simulator.setBrake(v),
   onFreeRev: (on) => { state.freeRev = on },
+  onLaunch: (on) => { state.launch = on; state.launchArmedAt = performance.now() },
   onReplaySelect: (name) => {
     settings = updateSettings({ replayFixture: name })
     state.replayTrace = fixtureByName.get(name) ?? null
@@ -215,6 +220,7 @@ async function buildEngine(ctx) {
 function stopEngine() {
   state.engineWanted = false
   pipeline.model.stop()
+  state.launch = false
   controls.setEngineState('stopping')
   controls.showResumeOverlay(false)
   releaseWakeLock()
@@ -389,7 +395,11 @@ function tick() {
     if (state.source === 'sim') pipeline.bus.push(simulator.step(dt, t0))
     else if (state.source === 'replay') state.replay?.step(t0)
 
-    const { estimate, frame } = pipeline.tick(t0, { freeRev: state.source === 'sim' && state.freeRev })
+    const { estimate, frame } = pipeline.tick(t0, {
+      freeRev: state.source === 'sim' && state.freeRev,
+      launch: state.launch,
+      aggressive: settings.shiftStyle === 'aggressive',
+    })
     state.lastEstimate = estimate
     state.lastFrame = frame
 
@@ -404,6 +414,7 @@ function tick() {
 
     const uiKey = frame.engineState
     if (uiKey !== lastUiState) { lastUiState = uiKey; controls.setEngineState(frame.engineState) }
+    updateLaunch(t0, estimate, frame)
     if (state.recordingSince != null) {
       controls.setRecording(true, (t0 - state.recordingSince) / 1000)
       if (t0 - state.recordFlushMs > 10_000) { state.recordFlushMs = t0; flushRecording() }
@@ -467,6 +478,17 @@ function draw() {
   requestAnimationFrame(draw)
 }
 
+// Launch control disarms itself once the car moves off (that's the launch), when the engine
+// isn't running, or after maxArmedS, so it never needs a tap while moving.
+function updateLaunch(t0, estimate, frame) {
+  if (state.launch && (frame.launchState !== 'armed' ||
+      t0 - state.launchArmedAt > vehicleConfig.launch.maxArmedS * 1000)) state.launch = false
+  const mode = frame.engineState !== 'running' ? 'unavailable'
+    : state.launch ? 'armed'
+    : (estimate.speedMps ?? 0) >= vehicleConfig.launch.creepSpeedMps ? 'moving' : 'ready'
+  if (mode !== state.launchUi) { state.launchUi = mode; controls.setLaunch(mode) }
+}
+
 // Logic runs on a timer (keeps going when rAF pauses); drawing runs on rAF.
 setInterval(tick, TICK_MS)
 requestAnimationFrame(draw)
@@ -485,6 +507,8 @@ window.__gt3rs = {
       replayPlaying: state.replay != null,
       errors: [...state.errors],
       enginesBuilt: state.enginesBuilt ?? 0,
+      launch: state.launch,
+      cut: state.lastFrame?.cut ?? 0,
       overlay: !document.getElementById('resume-overlay')?.hidden,
       levels: state.engine?.levels?.() ?? {},
     }

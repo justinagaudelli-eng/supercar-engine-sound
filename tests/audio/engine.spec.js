@@ -235,6 +235,8 @@ const SCENARIOS = {
   limiter: () => TL.limiter(),
   overrunPops: () => TL.overrun(),
   startStop: () => TL.startStop(),
+  launchControl: () => TL.launchControl(),
+  aggressiveShifts: () => TL.aggressiveShifts(),
 }
 
 for (const [name, make] of Object.entries(SCENARIOS)) {
@@ -251,6 +253,12 @@ for (const [name, make] of Object.entries(SCENARIOS)) {
       // count pops as residual bursts in the off-load part (informational)
       rep.popsAfterLift = countPops(r.x, 1.25)
     }
+    if (name === 'launchControl') {
+      // bangs on the 2-step (0.6–2.5 s), vs the plain 9000 rpm limiter for the same length
+      rep.bangsOnTwoStep = countPops(r.x.subarray(0, Math.round(2.5 * SR)), 0.6)
+      const lim = await render({ timeline: TL.limiter({ duration: 2.5 }).timeline, duration: 2.5 })
+      rep.popsOnPlainLimiter = countPops(lim.x, 0.6)
+    }
     A.writeSpectrogram(r.x, SR, join(REPORTS, `spectrogram-${name === 'sweep' ? 'rpm-sweep' : name}.png`), {
       overlay: (t) => rpmAt(t) / 20,
     })
@@ -260,6 +268,7 @@ for (const [name, make] of Object.entries(SCENARIOS)) {
     updateMetrics(`scenario_${name}`, rep)
     expectClean(name, rep)
     expectClean(`${name} (linear diagnostic)`, rep.linearDiagnostic, { diagnostic: true })
+    if (name === 'launchControl') expect(rep.bangsOnTwoStep, '2-step bangs').toBeGreaterThan(rep.popsOnPlainLimiter + 4)
     if (rep.tracking) expect(rep.tracking.within3pct, 'sweep firing tracking').toBeGreaterThanOrEqual(0.9)
   })
 }

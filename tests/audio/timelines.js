@@ -156,3 +156,35 @@ function interp(trace) {
     return trace[i][1]
   }
 }
+
+// Timelines produced by the real vehicle model (so they exercise its launch/shift logic).
+import { createRpmModel } from '../../src/vehicle/rpmModel.js'
+import { vehicleConfig } from '../../src/vehicle/config.js'
+
+function fromModel(duration, inputAt) {
+  const m = createRpmModel(vehicleConfig, { seed: 7 })
+  m.forceRunning()
+  const tl = [], rpmTrace = []
+  for (let t = 0; t <= duration; t += FRAME_DT) {
+    const f = m.step(FRAME_DT, inputAt(t))
+    rpmTrace.push([t, f.rpm])
+    tl.push({ t, frame: f })
+  }
+  return { timeline: tl, duration: duration + 0.3, rpmAt: interp(rpmTrace) }
+}
+
+/** Launch control: 2.5 s on the 2-step, then drive off hard (aggressive shifts). */
+export function launchControl() {
+  return fromModel(7, (t) => {
+    const go = Math.max(0, t - 2.5)
+    return { speedMps: go > 0 ? 5.5 * go : 0, accelMps2: go > 0 ? 5.5 : 0, load: go > 0 ? 1 : 0, launch: true, aggressive: true }
+  })
+}
+
+/** Aggressive style: full-throttle pull through the gears, then hard braking with blips. */
+export function aggressiveShifts() {
+  return fromModel(12, (t) => {
+    const v = t < 6 ? 2 + 5 * t : Math.max(0, 32 - 7 * (t - 6))
+    return { speedMps: v, accelMps2: t < 6 ? 5 : -7, load: t < 6 ? 1 : 0, aggressive: true }
+  })
+}

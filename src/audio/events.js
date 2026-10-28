@@ -23,6 +23,7 @@ export function frameToParams(frame) {
     cut: clamp01(Number.isFinite(f.cut) ? f.cut : 0),
     combustion,
     starter: clamp01(Number.isFinite(f.starter) ? f.starter : state === 'cranking' ? 1 : 0),
+    twoStep: state === 'running' ? clamp01(Number.isFinite(f.twoStep) ? f.twoStep : 0) : 0,
   }
 }
 
@@ -184,7 +185,7 @@ export function createEvents(ctx, config, destination) {
             if (load >= E.shiftCrack.minLoad) play(shots.shiftCrack, when, load)
             break
           }
-          default: break // 'downshift' / 'limiter': worklet handles via rpm/load/cut
+          default: break // 'downshift' / 'limiter' / 'twoStep' / 'launch': worklet handles via rpm/load/cut/twoStep
         }
       }
     },
