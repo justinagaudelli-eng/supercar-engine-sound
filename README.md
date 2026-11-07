@@ -12,6 +12,21 @@ through your Tesla's speakers, synced to how you're actually driving, using the 
 - **Hands-off.** Tap **Start Engine** once while parked, then never touch it.
 - **Static site** on GitHub Pages. No accounts, no server, no paid anything.
 
+**Cars** (pick one at the top of the screen; all procedurally synthesized, no recordings):
+
+| Car | Engine | Character |
+|---|---|---|
+| Porsche 911 GT3 RS (992) | 4.0 L flat-six NA, 9,000 rpm | the original: ITB howl, rasp above 6.5k |
+| Lamborghini Aventador SVJ | 6.5 L V12 NA, 8,700 rpm | smooth 12-cylinder scream, brutal ISR shifts, big crackles |
+| Lamborghini Huracán STO | 5.2 L V10 NA, 8,500 rpm | raspy V10 wail, short top-exit pipes, the most crackle |
+| Lamborghini Temerario | 4.0 L twin-turbo flat-plane V8 hybrid, 10,000 rpm | turbo V8 that still screams; little lag (e-motors) |
+| McLaren 765LT | 4.0 L twin-turbo flat-plane V8, 8,500 rpm | muted, whooshy, laggy boost, loud blow-off flutter |
+| Porsche 911 Turbo S (992) | 3.7 L twin-turbo flat-six, 7,200 rpm | deep and refined, turbo whistle, soft blow-off |
+
+Turbo cars add a turbo voice: boost that lags the throttle, a turbine whistle that rises with
+shaft speed, boost whoosh, and a blow-off "pssh" with compressor flutter when you lift or upshift.
+Profiles live in `src/cars.js` (gear ratios marked ESTIMATE where the maker hasn't published them).
+
 Live URL: **https://justinagaudelli-eng.github.io/gt3rs-engine-sound/**
 
 > In-cabin audio only. Volume is capped. Set everything up while parked; the app never needs

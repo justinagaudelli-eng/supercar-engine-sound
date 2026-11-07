@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-10-28T15:15:41.487Z",
+  "generatedAt": "2026-11-07T03:19:34.168Z",
   "launch-to-60": {
     "durationS": 25.2,
-    "renderMs": 631,
-    "realtimeFactor": 0.025,
+    "renderMs": 557,
+    "realtimeFactor": 0.0221,
     "peakDb": -4.33,
     "rmsDb": -20.39,
     "clicks": 0,
@@ -18,8 +18,8 @@
   },
   "highway-merge": {
     "durationS": 30.2,
-    "renderMs": 681,
-    "realtimeFactor": 0.0225,
+    "renderMs": 653,
+    "realtimeFactor": 0.0216,
     "peakDb": -4.33,
     "rmsDb": -19.18,
     "clicks": 0,
@@ -34,8 +34,8 @@
   },
   "steady-cruise": {
     "durationS": 44.2,
-    "renderMs": 951,
-    "realtimeFactor": 0.0215,
+    "renderMs": 918,
+    "realtimeFactor": 0.0208,
     "peakDb": -4.33,
     "rmsDb": -21.31,
     "clicks": 0,
@@ -50,8 +50,8 @@
   },
   "stop-and-go": {
     "durationS": 42.2,
-    "renderMs": 906,
-    "realtimeFactor": 0.0215,
+    "renderMs": 884,
+    "realtimeFactor": 0.0209,
     "peakDb": -4.33,
     "rmsDb": -20.39,
     "clicks": 0,
@@ -66,8 +66,8 @@
   },
   "hard-braking": {
     "durationS": 17.4,
-    "renderMs": 397,
-    "realtimeFactor": 0.0228,
+    "renderMs": 383,
+    "realtimeFactor": 0.022,
     "peakDb": -4.33,
     "rmsDb": -21.02,
     "clicks": 0,
@@ -82,8 +82,8 @@
   },
   "gps-dropout": {
     "durationS": 34.2,
-    "renderMs": 748,
-    "realtimeFactor": 0.0219,
+    "renderMs": 727,
+    "realtimeFactor": 0.0213,
     "peakDb": -4.33,
     "rmsDb": -21.27,
     "clicks": 0,
@@ -98,8 +98,8 @@
   },
   "noisy-fixes": {
     "durationS": 28.2,
-    "renderMs": 617,
-    "realtimeFactor": 0.0219,
+    "renderMs": 609,
+    "realtimeFactor": 0.0216,
     "peakDb": -4.33,
     "rmsDb": -20.78,
     "clicks": 0,

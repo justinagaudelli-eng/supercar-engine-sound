@@ -181,6 +181,24 @@ test.describe('built site', () => {
     await expect(page.locator('#shift-style [data-value="normal"]')).toHaveAttribute('aria-pressed', 'true')
   })
 
+  test('switching cars while running restarts the engine as the new car, and persists', async ({ page }) => {
+    const errors = watchErrors(page)
+    await page.goto(BASE)
+    await startEngine(page)
+    for (const id of ['svj', 'sto', 'temerario', '765lt', 'turbos', 'gt3rs']) {
+      await page.selectOption('#car', id)
+      await expect.poll(async () => (await appState(page)).car).toBe(id)
+      await expect.poll(async () => (await appState(page)).engineState, { timeout: 10_000 }).toBe('running')
+      await expect.poll(async () => (await appState(page)).rpm, { timeout: 10_000 }).toBeLessThan(1300)
+      await expect.poll(async () => (await appState(page)).levels.master, { timeout: 5000 }).toBeGreaterThan(-60)
+    }
+    await page.selectOption('#car', 'svj')
+    await page.reload()
+    await expect(page.locator('#car')).toHaveValue('svj')
+    await expect(page.locator('#car-engine')).toContainText('V12')
+    expect(errors).toEqual([])
+  })
+
   test('slicer tool page loads', async ({ page }) => {
     const errors = watchErrors(page)
     await page.goto(`${BASE}tools/slicer.html`)

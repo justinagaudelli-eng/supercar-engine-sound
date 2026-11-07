@@ -4,6 +4,7 @@
 export const SETTINGS_KEY = 'gt3rs-settings-v1'
 
 export const DEFAULT_SETTINGS = Object.freeze({
+  car: 'gt3rs',            // src/cars.js id
   volume: 0.7,
   mix: 0,                  // 0 = synth only, 1 = samples only
   preset: 'street',
@@ -17,6 +18,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
 })
 
 const ENUMS = {
+  car: ['gt3rs', 'svj', 'sto', 'temerario', '765lt', 'turbos'],
   preset: ['street', 'track', 'cabin'],
   shiftStyle: ['normal', 'aggressive'],
   source: ['gps', 'sim', 'replay'],

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-28T15:15:47.492Z",
+  "generatedAt": "2026-11-07T03:19:39.614Z",
   "sampleRate": 48000,
   "definitions": {
     "firingPeak": "strongest bin in [0.5,1.5]×rpm/20 Hz, Welch 32768 Hann, parabolic interp; |err| ≤ 3%",
@@ -945,8 +945,8 @@
     "peakDb": -3.63,
     "monoPeakDb": -4.56,
     "rmsDb": -17.48,
-    "renderMs": 315,
-    "realtimeFactor": 0.0234,
+    "renderMs": 310,
+    "realtimeFactor": 0.0229,
     "tracking": {
       "frames": 177,
       "within3pct": 0.977,
@@ -974,8 +974,8 @@
     "peakDb": -4.49,
     "monoPeakDb": -4.9,
     "rmsDb": -15.61,
-    "renderMs": 172,
-    "realtimeFactor": 0.0236,
+    "renderMs": 169,
+    "realtimeFactor": 0.0231,
     "linearDiagnostic": {
       "clicks": 0,
       "clickTimesS": [],
@@ -998,8 +998,8 @@
     "peakDb": -3.95,
     "monoPeakDb": -4.54,
     "rmsDb": -27.23,
-    "renderMs": 181,
-    "realtimeFactor": 0.0248,
+    "renderMs": 179,
+    "realtimeFactor": 0.0245,
     "linearDiagnostic": {
       "clicks": 0,
       "clickTimesS": [],
@@ -1022,8 +1022,8 @@
     "peakDb": -4.16,
     "monoPeakDb": -4.45,
     "rmsDb": -15.38,
-    "renderMs": 87,
-    "realtimeFactor": 0.0263,
+    "renderMs": 80,
+    "realtimeFactor": 0.0242,
     "linearDiagnostic": {
       "clicks": 0,
       "clickTimesS": [],
@@ -1046,8 +1046,8 @@
     "peakDb": -4.88,
     "monoPeakDb": -5.18,
     "rmsDb": -20.48,
-    "renderMs": 123,
-    "realtimeFactor": 0.0273,
+    "renderMs": 115,
+    "realtimeFactor": 0.0256,
     "popsAfterLift": 2,
     "linearDiagnostic": {
       "clicks": 0,
@@ -1071,8 +1071,8 @@
     "peakDb": -4.15,
     "monoPeakDb": -4.16,
     "rmsDb": -21.28,
-    "renderMs": 169,
-    "realtimeFactor": 0.0259,
+    "renderMs": 159,
+    "realtimeFactor": 0.0245,
     "linearDiagnostic": {
       "clicks": 0,
       "clickTimesS": [],
@@ -1149,18 +1149,18 @@
   "performance": {
     "audioSeconds": 10,
     "renderMsRuns": [
-      228,
-      229,
-      230
+      220,
+      224,
+      225
     ],
-    "renderSecondsBest": 0.228,
-    "realtimeFactor": 0.0228,
-    "cpuPercentOfOneCore": 2.28,
-    "synthOnlyRealtimeFactor": 0.0155,
-    "synthOnlyCpuPercentOfOneCore": 1.54,
+    "renderSecondsBest": 0.22,
+    "realtimeFactor": 0.022,
+    "cpuPercentOfOneCore": 2.19,
+    "synthOnlyRealtimeFactor": 0.0147,
+    "synthOnlyCpuPercentOfOneCore": 1.47,
     "note": "Offline render on the test machine (headless Chromium); full graph, not just the worklet. The Tesla CPU is slower: budget is <15% of a core.",
     "deterministic": true,
-    "sameSeedMaxDiffDb": -240
+    "sameSeedMaxDiffDb": -130.5
   },
   "scenario_launchControl": {
     "clicks": 0,
@@ -1172,8 +1172,8 @@
     "peakDb": -3.24,
     "monoPeakDb": -3.36,
     "rmsDb": -15.57,
-    "renderMs": 180,
-    "realtimeFactor": 0.0247,
+    "renderMs": 175,
+    "realtimeFactor": 0.0239,
     "bangsOnTwoStep": 10,
     "popsOnPlainLimiter": 5,
     "linearDiagnostic": {
@@ -1198,8 +1198,8 @@
     "peakDb": -3.4,
     "monoPeakDb": -3.57,
     "rmsDb": -18.28,
-    "renderMs": 324,
-    "realtimeFactor": 0.0263,
+    "renderMs": 279,
+    "realtimeFactor": 0.0227,
     "linearDiagnostic": {
       "clicks": 0,
       "clickTimesS": [],

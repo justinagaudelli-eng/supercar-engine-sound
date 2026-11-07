@@ -203,6 +203,9 @@ export const audioConfig = {
       thumpAttackS: 0.0015,
     },
 
+    // Turbocharger voice: null = naturally aspirated. Turbo cars set it in src/cars.js.
+    turbo: null,
+
     dcR: 0.999,                  // in-worklet DC blockers (≈ 7.6 Hz at 48 kHz)
     pulseDcR: 0.998,
   },

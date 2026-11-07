@@ -8,22 +8,24 @@ import { createRpmModel } from './vehicle/rpmModel.js'
 
 export function createPipeline({ input = inputConfig, vehicle = vehicleConfig, seed = 1 } = {}) {
   const bus = createInputBus(input)
-  const model = createRpmModel(vehicle, { seed })
   let lastMs = null
 
-  return {
+  const p = {
     bus,
-    model,
+    model: createRpmModel(vehicle, { seed }),
+    /** Swap the car (gearing, redline…). The new model starts with the engine off. */
+    setVehicle(v) { p.model = createRpmModel(v, { seed }) },
     /** Advance to nowMs; extra flags (e.g. freeRev) are passed to the rpm model. */
     tick(nowMs, extra = {}) {
       const dt = lastMs == null ? 0 : (nowMs - lastMs) / 1000
       lastMs = nowMs
       const estimate = bus.estimate(nowMs)
-      const frame = model.step(dt, { ...estimate, ...extra })
+      const frame = p.model.step(dt, { ...estimate, ...extra })
       return { estimate, frame }
     },
     resetClock() { lastMs = null },
   }
+  return p
 }
 
 /**
@@ -31,8 +33,8 @@ export function createPipeline({ input = inputConfig, vehicle = vehicleConfig, s
  * [{ t (s), frame, estimate }] for offline rendering. The engine starts already running
  * unless `withStartup` is set, in which case the trace starts after the startup sequence.
  */
-export function traceToTimeline(trace, { fps = 200, withStartup = false, tailS = 1, seed = 1 } = {}) {
-  const p = createPipeline({ seed })
+export function traceToTimeline(trace, { fps = 200, withStartup = false, tailS = 1, seed = 1, vehicle = vehicleConfig } = {}) {
+  const p = createPipeline({ seed, vehicle })
   const timeline = []
   let offsetS = 0
   if (withStartup) {

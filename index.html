@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0b0c0e">
   <meta name="color-scheme" content="dark">
-  <title>GT3 RS Engine Sound</title>
+  <title>Supercar Engine Sound</title>
   <link rel="stylesheet" href="./src/ui/styles.css">
 </head>
 <body>
@@ -22,6 +22,12 @@
 
     <section id="controls" class="control-panel" aria-label="Controls">
       <div id="message" class="message" role="alert" hidden></div>
+
+      <div class="field">
+        <label class="field-label" for="car">Car</label>
+        <select id="car" class="select"></select>
+        <p id="car-engine" class="hint"></p>
+      </div>
 
       <button id="btn-engine" class="btn btn-engine" type="button" data-state="off">Start Engine</button>
       <button id="btn-launch" class="btn btn-launch" type="button" aria-pressed="false" disabled>

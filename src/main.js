@@ -1,13 +1,12 @@
 // App orchestration: input sources → pipeline (filter + rpm model) → audio engine + UI.
 
 import { inputConfig } from './input/config.js'
-import { vehicleConfig } from './vehicle/config.js'
+import { buildCar, CARS } from './cars.js'
 import { createPipeline } from './pipeline.js'
 import { createGpsSource } from './input/gps.js'
 import { createSimulator } from './input/simulator.js'
 import { createReplay, validateTrace } from './input/replay.js'
 import { createEngine } from './audio/engine.js'
-import { audioConfig } from './audio/config.js'
 import { createTach } from './ui/tach.js'
 import { createControls } from './ui/controls.js'
 import { createDebugPanel } from './ui/debugPanel.js'
@@ -32,6 +31,7 @@ const fixtureByName = new Map(fixtures.map((f) => [f.name, f]))
 const replayRate = Math.max(0.25, Math.min(32, Number(new URLSearchParams(location.search).get('replayRate')) || 1))
 
 let settings = loadSettings()
+let current = buildCar(settings.car)   // { car, vehicle, audio } for the selected car
 const state = {
   ctx: null,
   engine: null,
@@ -62,8 +62,8 @@ const state = {
   },
 }
 
-const pipeline = createPipeline()
-const simulator = createSimulator()
+const pipeline = createPipeline({ vehicle: current.vehicle })
+let simulator = createSimulator(current.vehicle.sim)
 let gpsStatus = 'idle'
 const gps = createGpsSource(inputConfig.gps, {
   onSample: (s) => { if (state.source === 'gps') pipeline.bus.push(s) },
@@ -76,11 +76,15 @@ const gps = createGpsSource(inputConfig.gps, {
 })
 
 // ---------- UI ----------
-const tach = createTach(document.getElementById('tach'), {
-  redlineRpm: vehicleConfig.engine.redlineRpm,
-  maxRpm: 10000,
-  units: settings.units,
-})
+function makeTach() {
+  const red = current.vehicle.engine.redlineRpm
+  return createTach(document.getElementById('tach'), {
+    redlineRpm: red,
+    maxRpm: Math.ceil((red + 1000) / 1000) * 1000,
+    units: settings.units,
+  })
+}
+let tach = makeTach()
 const debug = createDebugPanel(document.getElementById('debug'), {
   open: settings.debugOpen,
   onToggle: (open) => { settings = updateSettings({ debugOpen: open }) },
@@ -126,6 +130,48 @@ const controls = createControls(document, {
     state.engine.testTone(on)
   },
 })
+// ---- car picker ----
+const carSelect = document.getElementById('car')
+const carEngine = document.getElementById('car-engine')
+for (const c of CARS) {
+  const opt = document.createElement('option')
+  opt.value = c.id
+  opt.textContent = c.name
+  carSelect?.append(opt)
+}
+function showCar() {
+  if (carSelect) carSelect.value = current.car.id
+  if (carEngine) carEngine.textContent = current.car.engine
+}
+showCar()
+carSelect?.addEventListener('change', () => switchCar(carSelect.value))
+
+// Swap gearing, redline and synth voice. If the engine is running, the new car starts up
+// straight away (the select change is a user gesture, so audio may resume).
+function switchCar(id) {
+  if (id === current.car.id) return
+  settings = updateSettings({ car: id })
+  current = buildCar(id)
+  showCar()
+  const wasRunning = state.engineWanted
+  state.launch = false
+  state.freeRev = false
+  pipeline.setVehicle(current.vehicle)
+  simulator = createSimulator(current.vehicle.sim)
+  tach.destroy()
+  tach = makeTach()
+  if (state.engine) {
+    const old = state.engine
+    state.engine = null
+    state.enginePromise = null
+    state.toneOn = false
+    controls.setTestTone(false)
+    old.dispose()
+  }
+  if (wasRunning) startEngine()
+  if ('mediaSession' in navigator && state.ctx) setupMediaSession()
+}
+
 const recovered = recoverInterruptedRecording()
 refreshFixtureList()
 controls.setSettings(settings)
@@ -201,7 +247,7 @@ function startEngine({ warm = false } = {}) {
 
 async function buildEngine(ctx) {
   state.enginesBuilt = (state.enginesBuilt ?? 0) + 1
-  const engine = await createEngine(ctx, { ...audioConfig, outputRoute: settings.outputRoute }, {
+  const engine = await createEngine(ctx, { ...current.audio, outputRoute: settings.outputRoute }, {
     onRouteFallback: ({ error }) => {
       controls.setMessage(`Media-element output failed (${error}); using direct Web Audio.`, 'warn', { timeoutMs: 8000 })
     },
@@ -230,7 +276,7 @@ function stopEngine() {
   clearTimeout(state.suspendTimer)
   state.suspendTimer = setTimeout(() => {
     if (!state.engineWanted && state.ctx?.state === 'running') state.ctx.suspend().catch(() => {})
-  }, (vehicleConfig.startup.shutdownS + 0.6) * 1000)
+  }, (current.vehicle.startup.shutdownS + 0.6) * 1000)
 }
 
 function resumeAudio() {
@@ -376,7 +422,7 @@ document.addEventListener('visibilitychange', () => {
 function setupMediaSession() {
   if (!('mediaSession' in navigator)) return
   try {
-    navigator.mediaSession.metadata = new window.MediaMetadata({ title: 'GT3 RS engine', artist: 'Procedural flat-six' })
+    navigator.mediaSession.metadata = new window.MediaMetadata({ title: `${current.car.short} engine`, artist: current.car.engine })
     navigator.mediaSession.setActionHandler('play', () => resumeAudio())
     navigator.mediaSession.setActionHandler('pause', () => state.ctx?.suspend())
   } catch { /* optional */ }
@@ -463,7 +509,7 @@ function draw() {
   if (f && e) {
     tach.draw({
       rpm: f.rpm, gear: f.engineState === 'running' ? f.gear : null,
-      speedMph: e.speedMps * MPS_TO_MPH, shifting: f.shifting, limiter: f.cut > 0 && f.rpm > vehicleConfig.engine.limiterRpm - 400,
+      speedMph: e.speedMps * MPS_TO_MPH, shifting: f.shifting, limiter: f.cut > 0 && f.rpm > current.vehicle.engine.limiterRpm - 400,
     })
     if (debug.open) debug.update({
       rawSpeedMps: e.rawSpeedMps, speedMps: e.speedMps, accelMps2: e.accelMps2, load: f.load,
@@ -482,10 +528,10 @@ function draw() {
 // isn't running, or after maxArmedS, so it never needs a tap while moving.
 function updateLaunch(t0, estimate, frame) {
   if (state.launch && (frame.launchState !== 'armed' ||
-      t0 - state.launchArmedAt > vehicleConfig.launch.maxArmedS * 1000)) state.launch = false
+      t0 - state.launchArmedAt > current.vehicle.launch.maxArmedS * 1000)) state.launch = false
   const mode = frame.engineState !== 'running' ? 'unavailable'
     : state.launch ? 'armed'
-    : (estimate.speedMps ?? 0) >= vehicleConfig.launch.creepSpeedMps ? 'moving' : 'ready'
+    : (estimate.speedMps ?? 0) >= current.vehicle.launch.creepSpeedMps ? 'moving' : 'ready'
   if (mode !== state.launchUi) { state.launchUi = mode; controls.setLaunch(mode) }
 }
 
@@ -511,7 +557,9 @@ window.__gt3rs = {
       cut: state.lastFrame?.cut ?? 0,
       overlay: !document.getElementById('resume-overlay')?.hidden,
       levels: state.engine?.levels?.() ?? {},
+      car: current.car.id,
     }
   },
+  switchCar,
 }
 
