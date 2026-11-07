@@ -1,0 +1,113 @@
+{
+ "version": 1,
+ "name": "gt3rs-recorded",
+ "loops": [
+  {
+   "file": "on_2000.wav",
+   "rpm": 2000,
+   "layer": "on",
+   "gain": 1.0
+  },
+  {
+   "file": "on_3000.wav",
+   "rpm": 3000,
+   "layer": "on",
+   "gain": 1.0
+  },
+  {
+   "file": "on_4000.wav",
+   "rpm": 4000,
+   "layer": "on",
+   "gain": 1.0
+  },
+  {
+   "file": "on_5000.wav",
+   "rpm": 5000,
+   "layer": "on",
+   "gain": 1.0
+  },
+  {
+   "file": "on_6000.wav",
+   "rpm": 6000,
+   "layer": "on",
+   "gain": 1.0
+  },
+  {
+   "file": "on_7000.wav",
+   "rpm": 7000,
+   "layer": "on",
+   "gain": 1.0
+  },
+  {
+   "file": "on_8000.wav",
+   "rpm": 8000,
+   "layer": "on",
+   "gain": 1.0
+  },
+  {
+   "file": "off_2000.wav",
+   "rpm": 2000,
+   "layer": "off",
+   "gain": 1.0
+  },
+  {
+   "file": "off_3000.wav",
+   "rpm": 3000,
+   "layer": "off",
+   "gain": 1.0
+  },
+  {
+   "file": "off_4000.wav",
+   "rpm": 4000,
+   "layer": "off",
+   "gain": 1.0
+  },
+  {
+   "file": "off_5000.wav",
+   "rpm": 5000,
+   "layer": "off",
+   "gain": 1.0
+  },
+  {
+   "file": "off_6000.wav",
+   "rpm": 6000,
+   "layer": "off",
+   "gain": 1.0
+  },
+  {
+   "file": "off_7000.wav",
+   "rpm": 7000,
+   "layer": "off",
+   "gain": 1.0
+  },
+  {
+   "file": "off_8000.wav",
+   "rpm": 8000,
+   "layer": "off",
+   "gain": 1.0
+  }
+ ],
+ "credits": [
+  {
+   "title": "Porsche 911 GT3 RS - engine and exhaust sound (YouTube 1t2wz1iLHJ4)",
+   "author": "Supercars67",
+   "license": "CC BY 3.0",
+   "url": "https://commons.wikimedia.org/wiki/File:Porsche_911_GT3_RS_-_engine_and_exhaust_sound_(YouTube_1t2wz1iLHJ4).opus",
+   "changes": "excerpts pitch-flattened to constant rpm, looped, level-matched"
+  },
+  {
+   "title": "Porsche 911 GT3 RS - engine and exhaust sound (YouTube hpwTF8TXcaA)",
+   "author": "NEW CARS 2015   Official",
+   "license": "CC BY 3.0",
+   "url": "https://commons.wikimedia.org/wiki/File:Porsche_911_GT3_RS_-_engine_and_exhaust_sound_(YouTube_hpwTF8TXcaA).opus",
+   "changes": "excerpts pitch-flattened to constant rpm, looped, level-matched"
+  },
+  {
+   "title": "Porsche 911 GT3 RS (991) - engine and exhaust sound (YouTube otznJ2rBoks)",
+   "author": "Automotion Media",
+   "license": "CC BY 3.0",
+   "url": "https://commons.wikimedia.org/wiki/File:Porsche_911_GT3_RS_(991)_-_engine_and_exhaust_sound_(YouTube_otznJ2rBoks).opus",
+   "changes": "excerpts pitch-flattened to constant rpm, looped, level-matched"
+  }
+ ]
+}
