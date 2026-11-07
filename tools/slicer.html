@@ -14,7 +14,7 @@
     <p class="lede">
       Load one recording of a rev sweep. The slicer finds the time each target RPM is reached, cuts a
       loop of whole firing cycles there (start and end on rising zero crossings), and gives you WAV loops plus
-      a <code>manifest.json</code> for <code>public/samples/</code>. Everything runs in this browser; nothing is uploaded.
+      a <code>manifest.json</code> for <code>public/samples/&lt;car&gt;/</code>. Everything runs in this browser; nothing is uploaded.
     </p>
   </header>
 
@@ -51,6 +51,7 @@
       </div>
       <fieldset class="grid">
         <legend>RPM source</legend>
+        <label>Car <select id="slicer-car"></select></label>
         <label class="radio"><input type="radio" name="rpm-mode" value="manual" checked> Manual: linear from start to end RPM</label>
         <label class="radio"><input type="radio" name="rpm-mode" value="estimated"> Pitch tracking (Estimate)</label>
         <label>Start RPM <input id="rpm-start" type="number" min="300" max="12000" step="50" value="1500"></label>
@@ -58,10 +59,10 @@
         <div class="buttons"><button id="btn-estimate" type="button">Estimate</button></div>
         <label>Detected pitch is…
           <select id="order">
-            <option value="3">the firing frequency (rpm ÷ 20)</option>
-            <option value="1.5">half the firing frequency (RPM ×2)</option>
-            <option value="6">double the firing frequency (RPM ×½)</option>
-            <option value="1">once per revolution (RPM ×3)</option>
+            <option value="1">the firing frequency (rpm × cylinders ÷ 120)</option>
+            <option value="0.5">half the firing frequency (RPM ×2)</option>
+            <option value="2">double the firing frequency (RPM ×½)</option>
+            <option value="rev">once per revolution</option>
           </select>
         </label>
         <label>Track from RPM <input id="min-rpm" type="number" min="200" max="5000" step="100" value="700"></label>

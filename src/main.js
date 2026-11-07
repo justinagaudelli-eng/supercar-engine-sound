@@ -143,6 +143,13 @@ function showCar() {
   if (carSelect) carSelect.value = current.car.id
   if (carEngine) carEngine.textContent = current.car.engine
 }
+// After the engine loads: tell the user whether this car has a recorded pack.
+function showPack(count) {
+  if (!carEngine) return
+  carEngine.textContent = `${current.car.engine} · ${count
+    ? `recorded pack (${count} loops) — raise Synth ↔ Sample`
+    : 'synth only (no recorded pack yet)'}`
+}
 showCar()
 carSelect?.addEventListener('change', () => switchCar(carSelect.value))
 
@@ -258,8 +265,11 @@ async function buildEngine(ctx) {
   engine.setVolume(settings.volume)
   engine.setMix(settings.mix)
   state.engine = engine
-  // Optional user samples; silently synth-only when absent.
-  engine.loadSamples(new URL('samples/manifest.json', document.baseURI).href).catch(() => {})
+  // Optional recorded pack for this car (public/samples/<car>/); silently synth-only when absent.
+  const carId = current.car.id
+  engine.loadSamples(new URL(`samples/${carId}/manifest.json`, document.baseURI).href)
+    .then((r) => { if (state.engine === engine) showPack(r.loaded ? r.count : 0) })
+    .catch(() => {})
   return engine
 }
 

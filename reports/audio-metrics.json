@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-07T03:19:39.614Z",
+  "generatedAt": "2026-11-07T03:35:11.742Z",
   "sampleRate": 48000,
   "definitions": {
     "firingPeak": "strongest bin in [0.5,1.5]×rpm/20 Hz, Welch 32768 Hann, parabolic interp; |err| ≤ 3%",

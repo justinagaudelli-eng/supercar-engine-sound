@@ -7,13 +7,17 @@ import {
   estimateRpmCurve, linearRpmCurve, fillCurveGaps, refinePeriod, createPhaseMap,
   warpToConstantPitch, freqFromRpm, FIRING_ORDER,
 } from './pitch.js'
+import { CARS, buildCar } from '../cars.js'
 import {
   chooseLoopPoints, crossfadeLoop, targetRpmTimes, rpmTargets, commonGain, detectActiveRange,
 } from './loopMath.js'
 
 const $ = (id) => document.getElementById(id)
 const SEAM_OK = 0.05           // seamError below this needs no crossfade
-const FIRINGS_PER_CYCLE = 6    // flat-six: 6 firings per 720 degrees
+// Engine layout of the car this pack is for: N cylinders fire N times per 720°, so the firing
+// frequency is engine order N/2 (rpm·N/120). Set from the Car select.
+let cylinders = 6
+const firingOrder = () => cylinders / 2
 
 const state = {
   bytes: null,           // original file bytes (kept to re-decode at another rate)
@@ -41,7 +45,7 @@ function readOptions() {
     mode: document.querySelector('input[name="rpm-mode"]:checked').value,
     rpmStart: num('rpm-start', 1500),
     rpmEnd: num('rpm-end', 9000),
-    order: num('order', FIRING_ORDER),
+    order: $('order').value === 'rev' ? 'rev' : num('order', 1),
     minRpm: num('min-rpm', 700),
     maxRpm: num('max-rpm', 10000),
     step: Math.max(50, num('rpm-step', 500)),
@@ -137,8 +141,10 @@ async function estimate() {
   setStatus('Tracking pitch…')
   await nextFrame()
   const t0 = performance.now()
+  // The tracker works in flat-six units (order 3); scale the search range to this engine.
+  const toTracker = firingOrder() / FIRING_ORDER
   state.estimate = estimateRpmCurve(state.mono, state.sampleRate, {
-    minRpm: o.minRpm, maxRpm: o.maxRpm, startS: o.trimStart, endS: o.trimEnd,
+    minRpm: o.minRpm * toTracker, maxRpm: o.maxRpm * toTracker, startS: o.trimStart, endS: o.trimEnd,
   })
   document.querySelector('input[name="rpm-mode"][value="estimated"]').checked = true
   const curve = activeCurve()
@@ -159,7 +165,10 @@ async function estimate() {
 /** The rpm curve in use, clipped to the sweep window: [{t, rpm|null}]. */
 function activeCurve(o = readOptions()) {
   if (o.mode === 'estimated' && state.estimate) {
-    const k = FIRING_ORDER / o.order
+    // estimate rpm is in order-3 units; detected pitch = r × firing frequency
+    const fo = firingOrder()
+    const r = o.order === 'rev' ? 1 / fo : o.order
+    const k = FIRING_ORDER / (fo * r)
     return state.estimate
       .filter((p) => p.t >= o.trimStart && p.t <= o.trimEnd)
       .map((p) => ({ t: p.t, rpm: p.rpm != null ? p.rpm * k : null }))
@@ -186,10 +195,10 @@ function planJobs(curve, o) {
 }
 
 function cycleCount(rpm, o) {
-  const f = freqFromRpm(rpm)
+  const f = freqFromRpm(rpm, firingOrder())
   let c = o.lenMode === 'cycles' ? Math.round(o.lenValue) : Math.round(o.lenValue * f)
-  if (o.engineCycles) c = Math.round(c / FIRINGS_PER_CYCLE) * FIRINGS_PER_CYCLE
-  return Math.max(o.engineCycles ? FIRINGS_PER_CYCLE : 1, c)
+  if (o.engineCycles) c = Math.round(c / cylinders) * cylinders
+  return Math.max(o.engineCycles ? cylinders : 1, c)
 }
 
 function sliceZeroPad(x, start, length) {
@@ -255,7 +264,7 @@ async function cut() {
 
 function cutOne(rpm, t, layer, o, { sr, outChans, phaseMap, filled }) {
   const cycles = cycleCount(rpm, o)
-  const nominalP = sr / freqFromRpm(rpm)
+  const nominalP = sr / freqFromRpm(rpm, firingOrder())
   const fade = Math.max(8, Math.min(Math.round(0.004 * sr), Math.floor(nominalP / 2)))
   const margin = Math.ceil(nominalP * 1.2) + fade + 16
   const segLen = Math.ceil(cycles * nominalP * 1.1) + 2 * margin
@@ -274,7 +283,7 @@ function cutOne(rpm, t, layer, o, { sr, outChans, phaseMap, filled }) {
     monoSeg = sliceZeroPad(state.mono, s0, segLen)
     seg = outChans.map((c) => (c === state.mono ? monoSeg : sliceZeroPad(c, s0, segLen)))
     period = refinePeriod(monoSeg, center, nominalP, { range: 0.08 })
-    loopRpm = Math.round((20 * sr / period) * 10) / 10   // firing period → rpm
+    loopRpm = Math.round(((120 / cylinders) * sr / period) * 10) / 10   // firing period → rpm
   }
 
   const pts = chooseLoopPoints(monoSeg, sr, center, period, cycles)
@@ -331,7 +340,7 @@ function downloadZip() {
   files.push({ name: 'manifest.json', data: manifest })
   const safe = readOptions().name.replace(/[^\w.-]+/g, '_') || 'samples'
   download(createZip(files), `${safe}.zip`, 'application/zip')
-  setStatus(`Downloaded ${safe}.zip. Unzip its contents into public/samples/.`, 'ok')
+  setStatus(`Downloaded ${safe}.zip. Unzip its contents into public/samples/${$('slicer-car').value}/.`, 'ok')
 }
 
 function downloadManifest() {
@@ -536,7 +545,29 @@ $('len-mode').addEventListener('change', () => {
   $('len-value').min = cycles ? '1' : '0.02'
   $('len-value').value = cycles ? '48' : '0.3'
 })
-for (const id of ['trim-start', 'trim-end', 'rpm-start', 'rpm-end', 'order']) {
+// Car select: sets the cylinder count (firing frequency) and the default pack name.
+{
+  const sel = $('slicer-car')
+  for (const c of CARS) {
+    const opt = document.createElement('option')
+    opt.value = c.id
+    opt.textContent = `${c.name} (${buildCar(c.id).audio.worklet.firingOrder.length} cyl)`
+    sel.append(opt)
+  }
+  const want = new URLSearchParams(location.search).get('car')
+  if (want && CARS.some((c) => c.id === want)) sel.value = want
+  const apply = () => {
+    const car = buildCar(sel.value)
+    cylinders = car.audio.worklet.firingOrder.length
+    $('set-name').value = car.car.id
+    $('max-rpm').value = Math.ceil((car.car.redlineRpm + 1000) / 100) * 100
+    if (typeof drawCurve === 'function' && state.mono) drawCurve()
+  }
+  sel.addEventListener('change', apply)
+  apply()
+}
+
+for (const id of ['trim-start', 'trim-end', 'rpm-start', 'rpm-end', 'order', 'slicer-car']) {
   $(id).addEventListener('change', drawCurve)
 }
 for (const r of document.querySelectorAll('input[name="rpm-mode"]')) r.addEventListener('change', drawCurve)
