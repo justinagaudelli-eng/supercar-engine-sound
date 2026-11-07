@@ -275,6 +275,56 @@ export const CARS = [
       },
     },
   },
+  {
+    // Not a real car: a made-up build tuned for a loud, high-revving, whistling turbo sound
+    // with only a few, quiet overrun pops.
+    id: 'custom',
+    name: 'Custom: 10,500 rpm twin-turbo',
+    short: 'Custom',
+    engine: 'custom 4.0 L twin-turbo flat-plane V8 · 10,500 rpm · loud turbo whistle, light pops',
+    redlineRpm: 10500,
+    vehicle: {
+      engine: { idleRpm: 1100, freeRevRiseRpmPerS: 19000, freeRevFallRpmPerS: 9000 },
+      gearbox: { ratios: [3.33, 2.4, 1.85, 1.48, 1.22, 1.03, 0.88], finalDrive: 3.9, tireCircumferenceM: 2.22 },
+      launch: { twoStepRpm: 5000, twoStepBounceRpm: 400 },
+      startup: { flareRpm: 3000 },
+      sim: { massKg: 1350 + 80, peakPowerW: 620000, tractionMu: 1.3, rearWeightFrac: 0.6, cdA: 0.72 },
+    },
+    audio: {
+      worklet: {
+        ...FLAT_PLANE_V8,
+        imbalance: { timingDeg: 1.5, gainLo: 0.1, gainHi: 0.05 },
+        pulse: { turbulence: 0.34 },
+        exhaust: {
+          headerA: { delayS: 0.0019, feedback: 0.4, lpHz: 5200 },
+          headerB: { delayS: 0.0021, feedback: 0.4, lpHz: 5200 },
+          main: { delayS: 0.0044, feedback: 0.38, lpHz: 3000 },
+          flapMixClosed: 0.4, flapMixOpen: 0.1,              // valves open early: loud
+          lowpass: { baseHz: 800, perRpmHz: 0.6, maxHz: 8500 }, // bright, screaming top end
+        },
+        rasp: { level: 0.3, drive: 4.5 },
+        intake: { tonal: 0.7, noise: 0.55, howl: { gain: 0.5 } },
+        mech: { orders: [4, 8, 12, 16], ampLo: [0.006, 0.004, 0.003, 0.0015], ampHi: [0.02, 0.018, 0.014, 0.01] },
+        // Light backfire: rare, quiet pops that stop soon after a lift.
+        overrun: { probBase: 0.0015, probPerRpm: 0.004, windowS: 0.7, gainMin: 0.2, gainMax: 0.35, burstProb: 0.05 },
+        turbo: {
+          ...TURBO,
+          spoolRpm: [2400, 5200], spoolTauS: 0.35, torqueLag: 0.3,
+          shaftUpTauS: 0.4, shaftDownTauS: 2.2,               // long whistle as the turbos spin down
+          shaftIdle: 0.18,
+          whine: { hzLo: 2800, hzHi: 9000, level: 0.075, h2: 0.3, loadMin: 0.75 },  // ~4× the others
+          whoosh: { hzLo: 1000, hzHi: 3800, q: 1.2, level: 0.16 },
+          bov: { ...TURBO.bov, level: 1.0, flutter: 0.65, flutterHz: 18, decayS: 0.3 },
+        },
+      },
+      // Louder and brighter than the stock cars (the limiter still caps the peaks).
+      presets: {
+        street: { exhaust: 1.2, intake: 1.0, drive: 1.25, highShelf: { gainDb: 2 }, outputGain: 1.25 },
+        track: { exhaust: 1.45, intake: 1.0, drive: 1.6, highShelf: { gainDb: 5 }, outputGain: 1.25 },
+        cabin: { intake: 1.35, outputGain: 1.6 },
+      },
+    },
+  },
 ]
 
 export const DEFAULT_CAR = 'gt3rs'

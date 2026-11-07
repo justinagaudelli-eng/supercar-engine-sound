@@ -40,7 +40,7 @@ test.describe('built site', () => {
     await page.goto(BASE)
     await startEngine(page)
     const packs = readdirSync(new URL('../../public/samples/', import.meta.url)).filter((d) => existsSync(new URL(`../../public/samples/${d}/manifest.json`, import.meta.url)))
-    for (const id of ['svj', 'sto', 'temerario', '765lt', 'turbos', 'gt3rs']) {
+    for (const id of ['svj', 'sto', 'temerario', '765lt', 'turbos', 'custom', 'gt3rs']) {
       if (id !== (await appState(page)).car) await page.selectOption('#car', id)
       await expect.poll(async () => (await appState(page)).engineState, { timeout: 10_000 }).toBe('running')
       if (packs.includes(id)) {
@@ -209,7 +209,7 @@ test.describe('built site', () => {
     const errors = watchErrors(page)
     await page.goto(BASE)
     await startEngine(page)
-    for (const id of ['svj', 'sto', 'temerario', '765lt', 'turbos', 'gt3rs']) {
+    for (const id of ['svj', 'sto', 'temerario', '765lt', 'turbos', 'custom', 'gt3rs']) {
       await page.selectOption('#car', id)
       await expect.poll(async () => (await appState(page)).car).toBe(id)
       await expect.poll(async () => (await appState(page)).engineState, { timeout: 10_000 }).toBe('running')

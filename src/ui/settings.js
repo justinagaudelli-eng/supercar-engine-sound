@@ -18,7 +18,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
 })
 
 const ENUMS = {
-  car: ['gt3rs', 'svj', 'sto', 'temerario', '765lt', 'turbos'],
+  car: ['gt3rs', 'svj', 'sto', 'temerario', '765lt', 'turbos', 'custom'],
   preset: ['street', 'track', 'cabin'],
   shiftStyle: ['normal', 'aggressive'],
   source: ['gps', 'sim', 'replay'],

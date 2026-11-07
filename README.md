@@ -127,6 +127,7 @@ recording, e.g. below 4,000 rpm on the 911 Turbo S, the synth fills in automatic
 | 765LT | idle–7,000 on, 3,000–7,000 off | 765LT, 600LT, 720S |
 | 911 Turbo S | 4,000–6,000 on, 2,000–6,000 off | 911 Turbo (992, 991), Turbo S (991) |
 | 911 GT3 RS | 2,000–8,000 on and off | GT3 RS (992 and 991) |
+| Custom (10,500 rpm twin-turbo) | none: synth only, tuned for a loud turbo whistle and light pops | n/a |
 
 The recordings are spotter and exhaust-maker videos, so expect some wind and crowd noise.
 To rebuild them (needs Python 3 with numpy and scipy, plus ffmpeg):
