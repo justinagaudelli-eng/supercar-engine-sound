@@ -12,7 +12,7 @@
 import { audioConfig as defaultConfig } from './config.js'
 import { createMixer } from './mixer.js'
 import { createEvents, frameToParams } from './events.js'
-import { createSampleLayer } from './sampleLayer.js'
+import { createSampleLayer, packCoverage } from './sampleLayer.js'
 
 // Vite rewrites this to the hashed asset URL at build time (works with base './').
 const WORKLET_URL = new URL('./flatSix.worklet.js', import.meta.url)
@@ -106,7 +106,10 @@ export async function createEngine(ctx, config = defaultConfig, options = {}) {
       lastWhen = when
       mixer.setDriveFor(p.rpm, p.load, when, gap)
       events.handle(frame, when)
-      if (sampleLayer) sampleLayer.update(p, when, gap)
+      if (sampleLayer) {
+        sampleLayer.update(p, when, gap)
+        mixer.setCoverage(packCoverage(p.rpm, sampleLayer.manifest.layers.on), when)
+      }
     },
 
     setPreset(name, when = ctx.currentTime) { mixer.setPreset(name, when) },
@@ -121,7 +124,7 @@ export async function createEngine(ctx, config = defaultConfig, options = {}) {
         sampleLayer = layer
         sampleLayer.update(lastFrameParams, ctx.currentTime)
         mixer.setSamplesActive(true)
-        return { loaded: true, count: layer.count, error: null }
+        return { loaded: true, count: layer.count, credits: layer.manifest.credits ?? [], error: null }
       } catch (e) {
         console.warn('[audio] sample layer disabled:', e.message)
         return { loaded: false, count: 0, error: e.message }

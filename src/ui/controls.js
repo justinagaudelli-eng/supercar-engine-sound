@@ -190,7 +190,7 @@ export function createControls(rootEl = document, handlers = {}) {
 
     setSettings(s = {}) {
       if (s.volume != null) setRange(el.volume, el.volumeOut, s.volume)
-      if (s.mix != null) setRange(el.mix, el.mixOut, s.mix)
+      if (s.blend != null) setRange(el.mix, el.mixOut, s.blend)
       if (s.preset) preset.select(s.preset)
       if (s.shiftStyle) shiftStyle.select(s.shiftStyle)
       if (s.source) api.setSource(s.source)

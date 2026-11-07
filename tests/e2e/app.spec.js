@@ -1,6 +1,6 @@
 // End-to-end: the production build (vite preview, port 4173) in headless Chromium.
 import { test, expect } from '@playwright/test'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync, existsSync } from 'node:fs'
 
 const BASE = 'http://localhost:4173/'
 const fixtures = JSON.parse(readFileSync(new URL('../../fixtures/index.json', import.meta.url)))
@@ -32,6 +32,30 @@ test.describe('built site', () => {
     await expect(page.locator('#tach')).toBeVisible()
     await expect(page.locator('#btn-engine')).toBeVisible()
     await page.waitForTimeout(500)
+    expect(errors).toEqual([])
+  })
+
+  test('cars with a recorded pack load it and play it; the rest stay synth only', async ({ page }) => {
+    const errors = watchErrors(page)
+    await page.goto(BASE)
+    await startEngine(page)
+    const packs = readdirSync(new URL('../../public/samples/', import.meta.url)).filter((d) => existsSync(new URL(`../../public/samples/${d}/manifest.json`, import.meta.url)))
+    for (const id of ['svj', 'sto', 'temerario', '765lt', 'turbos', 'gt3rs']) {
+      if (id !== (await appState(page)).car) await page.selectOption('#car', id)
+      await expect.poll(async () => (await appState(page)).engineState, { timeout: 10_000 }).toBe('running')
+      if (packs.includes(id)) {
+        await expect(page.locator('#car-engine')).toContainText('real recordings', { timeout: 15_000 })
+        await expect(page.locator('#car-engine')).toContainText('CC BY')
+        // At idle the pack only plays if it has a loop near idle; otherwise the synth covers it.
+        const m = JSON.parse(readFileSync(new URL(`../../public/samples/${id}/manifest.json`, import.meta.url)))
+        const lowest = Math.min(...m.loops.filter((l) => (l.layer ?? 'on') === 'on').map((l) => l.rpm))
+        const level = () => appState(page).then((s) => s.levels.sample)
+        if (lowest < 1100) await expect.poll(level, { timeout: 15_000 }).toBeGreaterThan(-60)
+        else if (lowest > 2000) await expect.poll(level, { timeout: 15_000 }).toBeLessThan(-80)
+      } else {
+        await expect(page.locator('#car-engine')).toContainText('synth only', { timeout: 15_000 })
+      }
+    }
     expect(errors).toEqual([])
   })
 

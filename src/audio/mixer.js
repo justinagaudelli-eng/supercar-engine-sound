@@ -152,6 +152,7 @@ export function createMixer(ctx, config) {
   let preset = config.presets[config.defaultPreset]
   let mix = 0
   let samplesActive = false
+  let coverage = 1            // 0..1: how well the recorded pack covers the current rpm
   let lastDrive = 1
   const lastRpmLoad = { rpm: 0, load: 0 }
   const lastDriveFor = () => driveForFrame(lastRpmLoad.rpm, lastRpmLoad.load, M, preset.drive)
@@ -176,7 +177,7 @@ export function createMixer(ctx, config) {
   }
 
   function applyMix(when, tau) {
-    const m = samplesActive ? mix : 0
+    const m = samplesActive ? mix * coverage : 0
     // equal-power synth/sample crossfade
     at(synthMix.gain, Math.cos(m * Math.PI / 2), when, tau)
     at(sampleMix.gain, Math.sin(m * Math.PI / 2) * M.samples, when, tau)
@@ -236,6 +237,14 @@ export function createMixer(ctx, config) {
     },
     setMix(m, when = ctx.currentTime) {
       mix = Math.max(0, Math.min(1, m))
+      applyMix(when, M.mixTauS)
+    },
+    /** Pack coverage at the current rpm (sampleLayer.coverage): outside it the synth takes over. */
+    setCoverage(c, when = ctx.currentTime) {
+      c = Math.max(0, Math.min(1, c))
+      if (Math.abs(c - coverage) < 0.02 && c !== 0 && c !== 1) return
+      if (c === coverage) return
+      coverage = c
       applyMix(when, M.mixTauS)
     },
     setSamplesActive(active, when = ctx.currentTime) {

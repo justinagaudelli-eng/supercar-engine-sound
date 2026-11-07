@@ -20,7 +20,7 @@ const throwing = {
 describe('settings', () => {
   it('has the documented defaults', () => {
     expect(DEFAULT_SETTINGS).toMatchObject({
-      volume: 0.7, mix: 0, preset: 'street', source: 'gps', units: 'mph', outputRoute: 'direct', debugOpen: false,
+      volume: 0.7, blend: 0.7, preset: 'street', source: 'gps', units: 'mph', outputRoute: 'direct', debugOpen: false,
     })
     expect(SETTINGS_KEY).toBe('gt3rs-settings-v1')
   })
@@ -45,13 +45,13 @@ describe('settings', () => {
   it('validates and clamps loaded values', () => {
     const s = loadSettings(memoryStorage({
       [SETTINGS_KEY]: JSON.stringify({
-        volume: 7, mix: -1, preset: 'drift', source: 'sim', units: 'furlongs', outputRoute: 'mediaElement',
+        volume: 7, blend: -1, preset: 'drift', source: 'sim', units: 'furlongs', outputRoute: 'mediaElement',
         debugOpen: 'yes', extra: 'dropped',
       }),
     }))
-    expect(s).toMatchObject({ volume: 1, mix: 0, preset: 'street', source: 'sim', units: 'mph', outputRoute: 'mediaElement', debugOpen: false })
+    expect(s).toMatchObject({ volume: 1, blend: 0, preset: 'street', source: 'sim', units: 'mph', outputRoute: 'mediaElement', debugOpen: false })
     expect(s).not.toHaveProperty('extra')
-    expect(sanitizeSettings({ volume: NaN, mix: '0.25' })).toMatchObject({ volume: 0.7, mix: 0.25 })
+    expect(sanitizeSettings({ volume: NaN, blend: "0.25" })).toMatchObject({ volume: 0.7, blend: 0.25 })
   })
 
   it('roundtrips through storage and merges updates', () => {

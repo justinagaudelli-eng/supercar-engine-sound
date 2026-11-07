@@ -81,5 +81,6 @@ export function parseManifest(json, baseUrl) {
   if (!hasOn) layers.on = layers.off
   if (!hasOff) layers.off = layers.on
 
-  return { version, name: m.name ?? '', loops, layers, hasOn, hasOff }
+  const credits = Array.isArray(m.credits) ? m.credits.filter((c) => c && typeof c === 'object') : []
+  return { version, name: m.name ?? '', loops, layers, hasOn, hasOff, credits }
 }

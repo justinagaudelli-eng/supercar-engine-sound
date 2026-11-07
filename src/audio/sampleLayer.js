@@ -29,6 +29,19 @@ export function crossfadeWeights(rpm, loops) {
   return w
 }
 
+/**
+ * How well a pack covers `rpm` (0..1). Loops are only stretched so far before they sound
+ * wrong, so beyond the lowest / highest recorded rpm the sample layer fades out (and the
+ * mixer brings the synth back): full coverage down to lowest/1.15 and up to highest·1.08,
+ * gone below lowest/1.5 or above highest·1.3 (log-linear in between).
+ */
+export function packCoverage(rpm, loops) {
+  if (!loops?.length || !(rpm > 0)) return 1
+  const lo = loops[0].rpm, hi = loops[loops.length - 1].rpm
+  const ramp = (x, a, b) => Math.max(0, Math.min(1, (Math.log(x) - Math.log(a)) / (Math.log(b) - Math.log(a))))
+  return Math.min(ramp(rpm, lo / 1.5, lo / 1.15), 1 - ramp(rpm, hi * 1.08, hi * 1.3))
+}
+
 /** Equal-power on/off layer weights from load (0 = off/overrun, 1 = on). */
 export function loadWeights(load) {
   const l = Math.max(0, Math.min(1, Number.isFinite(load) ? load : 0))

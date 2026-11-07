@@ -1,0 +1,52 @@
+{
+ "version": 1,
+ "name": "sto-recorded",
+ "loops": [
+  {
+   "file": "on_2000.wav",
+   "rpm": 2000,
+   "layer": "on",
+   "gain": 1.0
+  },
+  {
+   "file": "on_3000.wav",
+   "rpm": 3000,
+   "layer": "on",
+   "gain": 1.0
+  },
+  {
+   "file": "on_4000.wav",
+   "rpm": 4000,
+   "layer": "on",
+   "gain": 1.0
+  },
+  {
+   "file": "on_6000.wav",
+   "rpm": 6000,
+   "layer": "on",
+   "gain": 1.0
+  },
+  {
+   "file": "on_7000.wav",
+   "rpm": 7000,
+   "layer": "on",
+   "gain": 1.0
+  }
+ ],
+ "credits": [
+  {
+   "title": "Lamborghini Huracan Performante - engine and exhaust sound (YouTube QsDJ3Y7k4qg)",
+   "author": "NewsTechCars",
+   "license": "CC BY 3.0",
+   "url": "https://commons.wikimedia.org/wiki/File:Lamborghini_Huracan_Performante_-_engine_and_exhaust_sound_(YouTube_QsDJ3Y7k4qg).opus",
+   "changes": "excerpts pitch-flattened to constant rpm, looped, level-matched"
+  },
+  {
+   "title": "Lamborghini Huracán Performante with Fi Exhaust system - engine and exhaust sound (YouTube p4F3h9Q5Lpo)",
+   "author": "FiExhaust",
+   "license": "CC BY 3.0",
+   "url": "https://commons.wikimedia.org/wiki/File:Lamborghini_Huracán_Performante_with_Fi_Exhaust_system_-_engine_and_exhaust_sound_(YouTube_p4F3h9Q5Lpo).opus",
+   "changes": "excerpts pitch-flattened to constant rpm, looped, level-matched"
+  }
+ ]
+}

@@ -6,7 +6,7 @@ export const SETTINGS_KEY = 'gt3rs-settings-v1'
 export const DEFAULT_SETTINGS = Object.freeze({
   car: 'gt3rs',            // src/cars.js id
   volume: 0.7,
-  mix: 0,                  // 0 = synth only, 1 = samples only
+  blend: 0.7,              // synth ↔ recorded pack: 0 = synth only, 1 = samples only (synth-only cars ignore it)
   preset: 'street',
   shiftStyle: 'aggressive', // 'normal' = comfortable road shifts; 'aggressive' = Sport+/track
   source: 'gps',
@@ -36,7 +36,7 @@ export function sanitizeSettings(raw) {
   const src = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {}
   const out = { ...DEFAULT_SETTINGS }
   out.volume = unit(src.volume, DEFAULT_SETTINGS.volume)
-  out.mix = unit(src.mix, DEFAULT_SETTINGS.mix)
+  out.blend = unit(src.blend, DEFAULT_SETTINGS.blend)
   for (const [key, allowed] of Object.entries(ENUMS)) {
     if (allowed.includes(src[key])) out[key] = src[key]
   }

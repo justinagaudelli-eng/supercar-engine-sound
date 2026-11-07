@@ -1,0 +1,101 @@
+{
+ "version": 1,
+ "name": "765lt-recorded",
+ "loops": [
+  {
+   "file": "on_1000.wav",
+   "rpm": 1000,
+   "layer": "on",
+   "gain": 1.0
+  },
+  {
+   "file": "on_2000.wav",
+   "rpm": 2000,
+   "layer": "on",
+   "gain": 1.0
+  },
+  {
+   "file": "on_3000.wav",
+   "rpm": 3000,
+   "layer": "on",
+   "gain": 1.0
+  },
+  {
+   "file": "on_4000.wav",
+   "rpm": 4000,
+   "layer": "on",
+   "gain": 1.0
+  },
+  {
+   "file": "on_5000.wav",
+   "rpm": 5000,
+   "layer": "on",
+   "gain": 1.0
+  },
+  {
+   "file": "on_6000.wav",
+   "rpm": 6000,
+   "layer": "on",
+   "gain": 1.0
+  },
+  {
+   "file": "on_7000.wav",
+   "rpm": 7000,
+   "layer": "on",
+   "gain": 1.0
+  },
+  {
+   "file": "off_3000.wav",
+   "rpm": 3000,
+   "layer": "off",
+   "gain": 1.0
+  },
+  {
+   "file": "off_4000.wav",
+   "rpm": 4000,
+   "layer": "off",
+   "gain": 1.0
+  },
+  {
+   "file": "off_5000.wav",
+   "rpm": 5000,
+   "layer": "off",
+   "gain": 1.0
+  },
+  {
+   "file": "off_6000.wav",
+   "rpm": 6000,
+   "layer": "off",
+   "gain": 1.0
+  },
+  {
+   "file": "off_7000.wav",
+   "rpm": 7000,
+   "layer": "off",
+   "gain": 1.0
+  }
+ ],
+ "credits": [
+  {
+   "title": "McLaren 765LT - engine and exhaust sound (YouTube 5oSRv66QFW0)",
+   "author": "Hungarian Supercar Spotters",
+   "license": "CC BY 3.0",
+   "url": "https://commons.wikimedia.org/wiki/File:McLaren_765LT_-_engine_and_exhaust_sound_(YouTube_5oSRv66QFW0).opus",
+   "changes": "excerpts pitch-flattened to constant rpm, looped, level-matched"
+  },
+  {
+   "title": "McLaren 600LT with Fi Exhaust system - engine and exhaust sound (YouTube RXj9PUkF0gk)",
+   "author": "FiExhaust",
+   "license": "CC BY 3.0",
+   "url": "https://commons.wikimedia.org/wiki/File:McLaren_600LT_with_Fi_Exhaust_system_-_engine_and_exhaust_sound_(YouTube_RXj9PUkF0gk).opus",
+   "changes": "excerpts pitch-flattened to constant rpm, looped, level-matched"
+  },
+  {
+   "title": "McLaren 720S with Novitec exhaust - engine and exhaust sound (YouTube XfgP-gX7KNg)",
+   "author": "Supercars67",
+   "license": "CC BY 3.0",
+   "url": "https://commons.wikimedia.org/wiki/File:McLaren_720S_with_Novitec_exhaust_-_engine_and_exhaust_sound_(YouTube_XfgP-gX7KNg).opus",
+   "changes": "excerpts pitch-flattened to constant rpm, looped, level-matched"
+  }
+ ]
+}

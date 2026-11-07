@@ -94,7 +94,7 @@ const controls = createControls(document, {
   onStop: stopEngine,
   onResume: () => resumeAudio(),
   onVolume: (v) => { settings = updateSettings({ volume: v }); state.engine?.setVolume(v) },
-  onMix: (v) => { settings = updateSettings({ mix: v }); state.engine?.setMix(v) },
+  onMix: (v) => { settings = updateSettings({ blend: v }); state.engine?.setMix(v) },
   onPreset: (p) => { settings = updateSettings({ preset: p }); state.engine?.setPreset(p) },
   onShiftStyle: (v) => { settings = updateSettings({ shiftStyle: v }) },
   onSource: (s) => setSource(s),
@@ -144,10 +144,11 @@ function showCar() {
   if (carEngine) carEngine.textContent = current.car.engine
 }
 // After the engine loads: tell the user whether this car has a recorded pack.
-function showPack(count) {
+function showPack(count, credits = []) {
   if (!carEngine) return
+  const who = credits.map((c) => c.author).filter(Boolean)
   carEngine.textContent = `${current.car.engine} · ${count
-    ? `recorded pack (${count} loops) — raise Synth ↔ Sample`
+    ? `real recordings (${count} loops)${who.length ? ` by ${[...new Set(who)].join(', ')}, CC BY` : ''} · blend with Synth ↔ Sample`
     : 'synth only (no recorded pack yet)'}`
 }
 showCar()
@@ -263,12 +264,12 @@ async function buildEngine(ctx) {
   engine.connect(ctx.destination)
   engine.setPreset(settings.preset)
   engine.setVolume(settings.volume)
-  engine.setMix(settings.mix)
+  engine.setMix(settings.blend)
   state.engine = engine
   // Optional recorded pack for this car (public/samples/<car>/); silently synth-only when absent.
   const carId = current.car.id
   engine.loadSamples(new URL(`samples/${carId}/manifest.json`, document.baseURI).href)
-    .then((r) => { if (state.engine === engine) showPack(r.loaded ? r.count : 0) })
+    .then((r) => { if (state.engine === engine) showPack(r.loaded ? r.count : 0, r.credits) })
     .catch(() => {})
   return engine
 }

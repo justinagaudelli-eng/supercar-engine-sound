@@ -1,0 +1,113 @@
+{
+ "version": 1,
+ "name": "svj-recorded",
+ "loops": [
+  {
+   "file": "on_950.wav",
+   "rpm": 950,
+   "layer": "on",
+   "gain": 1.0
+  },
+  {
+   "file": "on_2000.wav",
+   "rpm": 2000,
+   "layer": "on",
+   "gain": 1.0
+  },
+  {
+   "file": "on_3000.wav",
+   "rpm": 3000,
+   "layer": "on",
+   "gain": 1.0
+  },
+  {
+   "file": "on_4000.wav",
+   "rpm": 4000,
+   "layer": "on",
+   "gain": 1.0
+  },
+  {
+   "file": "on_5000.wav",
+   "rpm": 5000,
+   "layer": "on",
+   "gain": 1.0
+  },
+  {
+   "file": "on_6000.wav",
+   "rpm": 6000,
+   "layer": "on",
+   "gain": 1.0
+  },
+  {
+   "file": "on_7000.wav",
+   "rpm": 7000,
+   "layer": "on",
+   "gain": 1.0
+  },
+  {
+   "file": "on_8000.wav",
+   "rpm": 8000,
+   "layer": "on",
+   "gain": 1.0
+  },
+  {
+   "file": "off_2000.wav",
+   "rpm": 2000,
+   "layer": "off",
+   "gain": 1.0
+  },
+  {
+   "file": "off_3000.wav",
+   "rpm": 3000,
+   "layer": "off",
+   "gain": 1.0
+  },
+  {
+   "file": "off_4000.wav",
+   "rpm": 4000,
+   "layer": "off",
+   "gain": 1.0
+  },
+  {
+   "file": "off_5000.wav",
+   "rpm": 5000,
+   "layer": "off",
+   "gain": 1.0
+  },
+  {
+   "file": "off_6000.wav",
+   "rpm": 6000,
+   "layer": "off",
+   "gain": 1.0
+  },
+  {
+   "file": "off_8000.wav",
+   "rpm": 8000,
+   "layer": "off",
+   "gain": 1.0
+  }
+ ],
+ "credits": [
+  {
+   "title": "Lamborghini Aventador - engine and exhaust sound (YouTube oMKxhIcSmZs)",
+   "author": "Super Cars for you",
+   "license": "CC BY 3.0",
+   "url": "https://commons.wikimedia.org/wiki/File:Lamborghini_Aventador_-_engine_and_exhaust_sound_(YouTube_oMKxhIcSmZs).opus",
+   "changes": "excerpts pitch-flattened to constant rpm, looped, level-matched"
+  },
+  {
+   "title": "Lamborghini Aventador SV - engine and exhaust sound (YouTube qll6WBfaXvM)",
+   "author": "Erwin Lindsen",
+   "license": "CC BY 3.0",
+   "url": "https://commons.wikimedia.org/wiki/File:Lamborghini_Aventador_SV_-_engine_and_exhaust_sound_(YouTube_qll6WBfaXvM).opus",
+   "changes": "excerpts pitch-flattened to constant rpm, looped, level-matched"
+  },
+  {
+   "title": "Lamborghini Aventador SVJ - engine and exhaust sound (YouTube zqv9zLtHsUM)",
+   "author": "ePic eXhaust",
+   "license": "CC BY 3.0",
+   "url": "https://commons.wikimedia.org/wiki/File:Lamborghini_Aventador_SVJ_-_engine_and_exhaust_sound_(YouTube_zqv9zLtHsUM).opus",
+   "changes": "excerpts pitch-flattened to constant rpm, looped, level-matched"
+  }
+ ]
+}

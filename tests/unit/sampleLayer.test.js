@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { crossfadeWeights, loadWeights } from '../../src/audio/sampleLayer.js'
+import { packCoverage, crossfadeWeights, loadWeights } from '../../src/audio/sampleLayer.js'
 
 const loops = [2000, 4000, 6000, 8000].map((rpm) => ({ rpm }))
 const nonZero = (w) => w.map((v, i) => [i, v]).filter(([, v]) => v > 1e-12).map(([i]) => i)
@@ -59,5 +59,23 @@ describe('loadWeights', () => {
     expect(h.on ** 2 + h.off ** 2).toBeCloseTo(1, 12)
     expect(loadWeights(2).on).toBe(1)
     expect(loadWeights(-1).off).toBe(1)
+  })
+})
+
+describe('packCoverage', () => {
+  const loops = [{ rpm: 1000 }, { rpm: 4000 }, { rpm: 8000 }]
+  it('is 1 inside the recorded range and a little beyond it', () => {
+    for (const r of [1000, 900, 2500, 8000, 8600]) expect(packCoverage(r, loops)).toBe(1)
+  })
+  it('fades out well below the lowest and above the highest loop', () => {
+    expect(packCoverage(600, loops)).toBe(0)
+    expect(packCoverage(10500, loops)).toBe(0)
+    const mid = packCoverage(780, loops)
+    expect(mid).toBeGreaterThan(0); expect(mid).toBeLessThan(1)
+    expect(packCoverage(9500, loops)).toBeLessThan(1)
+  })
+  it('is 1 for an empty pack or a bad rpm', () => {
+    expect(packCoverage(3000, [])).toBe(1)
+    expect(packCoverage(NaN, loops)).toBe(1)
   })
 })

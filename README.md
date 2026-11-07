@@ -111,9 +111,44 @@ highway merge, steady cruise, stop-and-go, hard braking, GPS dropout (tunnel), a
 
 ---
 
+## Real-recording packs (built in)
+
+Every car ships with a **recorded pack** made from real recordings of that car (or its closest
+sibling) on Wikimedia Commons, all licensed **CC BY 3.0**. The credits show under the car picker
+and are listed in [public/samples/CREDITS.md](public/samples/CREDITS.md). The
+**Synth ↔ Sample** slider sets the blend (default 70 % recording). Wherever a pack has no
+recording, e.g. below 4,000 rpm on the 911 Turbo S, the synth fills in automatically.
+
+| Car | Recorded rpm range | Sources |
+|---|---|---|
+| Aventador SVJ | idle–8,000 on and off throttle | Aventador SVJ, SV and Aventador |
+| Huracán STO | 2,000–7,000 on throttle (thin pack) | Huracán Performante (same V10) |
+| Temerario | idle–8,000 on, 2,000–9,000 off | Temerario (Novitec exhaust) |
+| 765LT | idle–7,000 on, 3,000–7,000 off | 765LT, 600LT, 720S |
+| 911 Turbo S | 4,000–6,000 on, 2,000–6,000 off | 911 Turbo (992, 991), Turbo S (991) |
+| 911 GT3 RS | 2,000–8,000 on and off | GT3 RS (992 and 991) |
+
+The recordings are spotter and exhaust-maker videos, so expect some wind and crowd noise.
+To rebuild them (needs Python 3 with numpy and scipy, plus ffmpeg):
+
+```bash
+python3 -m pip install --user numpy scipy
+python3 -P tools/packs/download.py                    # recordings → tools/packs/rec/ (slow, rate-limited)
+tools/packs/buildall.sh /tmp/packs                    # track rpm, de-chirp, loop, quality-check
+python3 -P tools/packs/preview.py /tmp/packs/svj 950 8700 /tmp/svj.wav   # listen to a rev
+python3 -P tools/packs/install.py /tmp/packs . svj sto temerario 765lt turbos gt3rs
+```
+
+How it works: `track.py` follows the firing frequency through each recording, using a harmonic sum plus a
+Viterbi path, and was checked against synth renders with known rpm: 98 % within 3.5 %.
+`extract.py` finds loud, confident stretches near each target rpm, splitting rising rpm (on)
+from falling rpm (off). It resamples each stretch so its rpm is exactly constant, splices up to 6
+stretches from one recording with phase-aligned crossfades, and rejects anything that fails a
+harmonic-clarity and octave check.
+
 ## Adding your own samples (optional)
 
-The synth is the default, so you never need samples. If you have a legally usable recording
+The synth is always there, so you never need samples. If you have a legally usable recording
 (see RESEARCH.md §4 for CC-licensed Porsche clips you can download yourself):
 
 1. Open **`/tools/slicer.html`** (linked from the app, or `<live URL>/tools/slicer.html`).
@@ -124,8 +159,8 @@ The synth is the default, so you never need samples. If you have a legally usabl
 4. Choose the RPM step (default 500), loop length and layer (`on` = throttle, `off` = overrun),
    then tap **Slice**. It cuts RPM-tagged loops that are a whole number of firing cycles long,
    start and end on rising zero crossings, and are seam-crossfaded. All loops share one gain.
-5. Download the ZIP. Unzip it into `public/samples/` so you have `public/samples/manifest.json`
-   plus WAVs, then commit and push. The site redeploys.
+5. Download the ZIP. Unzip it into `public/samples/<car>/` (e.g. `public/samples/svj/`) so you have
+   `manifest.json` plus WAVs there, replacing the built-in pack. Then rebuild and redeploy.
 6. In the app, raise the **Synth ↔ Sample** slider. The engine crossfades between the two nearest
    RPM loops (equal power), pitch-shifts them to the exact RPM, and blends on/off layers by load.
    With no manifest present it silently stays synth-only.
